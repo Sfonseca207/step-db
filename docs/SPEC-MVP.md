@@ -519,7 +519,7 @@ Cada fase termina con build, lint y tests en verde, y un commit. Los criterios d
 ## 10. Reglas para la ejecución autónoma (sesión nocturna)
 
 1. **No hacer preguntas.** Ante una ambigüedad, tomar la opción más simple que cumpla la spec y registrarla en `docs/DECISIONES.md` (fecha, decisión, alternativa descartada y motivo).
-2. Seguir las fases en orden. **Commit al final de cada fase** (y en puntos intermedios estables) con mensajes descriptivos. Solo commitear con build, lint y tests en verde.
+2. Seguir las fases en orden. **Commit al final de cada fase** (y en puntos intermedios estables) con mensajes descriptivos. Solo commitear con build, lint y tests en verde. **Los commits no llevan ninguna atribución a Claude**: nada de `Co-Authored-By: Claude …`, ni "Generated with Claude Code", ni menciones similares en mensajes de commit o descripciones de PR.
 3. Verificar APIs de librerías con **context7** antes de usarlas; no asumir APIs de memoria.
 4. Verificar visualmente con **Playwright MCP**: levantar `npm run dev`, navegar a la app, tomar capturas de las fases 3, 4 y 7 y revisar que se vean bien (colores, relaciones, animaciones sin glitches). Guardar las capturas finales en `docs/screenshots/`.
 5. Si una funcionalidad se atasca tras varios intentos razonables, dejarla detrás de un stub o flag, anotarla en `docs/PENDIENTES.md` con lo intentado y **continuar** con la siguiente.

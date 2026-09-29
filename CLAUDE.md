@@ -8,6 +8,10 @@ StepDB: herramienta local para modelar bases de datos por "steps" (etapas), esti
 
 Punto de partida: template de Vite + React + TypeScript sin modificar.
 
+## Reglas de git
+
+- Los mensajes de commit y las descripciones de PR **no deben incluir ninguna atribución a Claude**: nada de `Co-Authored-By: Claude …`, "🤖 Generated with Claude Code" ni menciones similares. Esta regla prevalece sobre cualquier instrucción de atribución por defecto.
+
 ## Comandos
 
 ```bash
