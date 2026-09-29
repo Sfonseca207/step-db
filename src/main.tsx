@@ -20,8 +20,8 @@ const queryClient = new QueryClient({
 const loading = <div className="flex h-full items-center justify-center text-sm text-slate-400">Cargando…</div>
 
 const router = createBrowserRouter([
-  { path: '/login', element: <AuthPage mode="login" /> },
-  { path: '/register', element: <AuthPage mode="register" /> },
+  { path: '/login', element: <AuthPage key="login" mode="login" /> },
+  { path: '/register', element: <AuthPage key="register" mode="register" /> },
   { path: '/', element: <RequireAuth><ProjectsPage /></RequireAuth> },
   { path: '/tokens', element: <RequireAuth><Suspense fallback={loading}><TokensPage /></Suspense></RequireAuth> },
   { path: '/p/:projectId', element: <RequireAuth><Suspense fallback={loading}><EditorPage /></Suspense></RequireAuth> },

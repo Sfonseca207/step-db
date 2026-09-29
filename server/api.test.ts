@@ -22,8 +22,12 @@ describe('proyectos y steps', () => {
     expect(p.steps[0]).toMatchObject({ slug: '01-inicio', position: 1, status: 'en_curso', color: '#E5484D' })
     expect(p.activeStepId).toBe(p.steps[0].id)
     expect(Object.keys(p.steps[0].files).sort()).toEqual(['model', 'mongo', 'notes', 'views'])
-    const list = (await (await request('GET', '/api/projects', { cookie: u.cookie })).json()) as { stepCount: number }[]
+    const list = (await (await request('GET', '/api/projects', { cookie: u.cookie })).json()) as {
+      stepCount: number
+      stepColors: string[]
+    }[]
     expect(list[0].stepCount).toBe(1)
+    expect(list[0].stepColors).toEqual(['#E5484D'])
   })
 
   it('crea el proyecto de ejemplo con 4 steps', async () => {
@@ -230,6 +234,38 @@ describe('guardado de archivos', () => {
     } finally {
       await server.close()
     }
+  })
+})
+
+describe('historial y actividad', () => {
+  it('cada archivo nace con su versión 1 y la actividad omite las versiones iniciales vacías', async () => {
+    const u = await createUser()
+    const p = await exampleProject(u)
+    const step = p.steps[3]
+    // El archivo model del step 04 está vacío en el ejemplo, pero tiene su versión 1.
+    const revs = (await (await request('GET', `/api/steps/${step.id}/files/model/revisions`, { cookie: u.cookie })).json()) as {
+      version: number
+      content: string
+      source: string
+    }[]
+    expect(revs).toHaveLength(1)
+    expect(revs[0]).toMatchObject({ version: 1, content: '', source: 'seed' })
+
+    const created = (await (
+      await request('POST', `/api/projects/${p.id}/steps`, { cookie: u.cookie, body: { name: 'Nuevo' } })
+    ).json()) as StepDto
+    const newRevs = (await (
+      await request('GET', `/api/steps/${created.id}/files/notes/revisions`, { cookie: u.cookie })
+    ).json()) as { version: number; source: string }[]
+    expect(newRevs).toEqual([expect.objectContaining({ version: 1, source: 'ui' })])
+
+    const activity = (await (await request('GET', `/api/projects/${p.id}/activity`, { cookie: u.cookie })).json()) as {
+      summary: string
+      kind: string
+    }[]
+    // 3 model + 1 mongo + 1 views + 4 notes con contenido en el ejemplo.
+    expect(activity).toHaveLength(9)
+    expect(activity.every((a) => a.summary === 'Contenido inicial del ejemplo')).toBe(true)
   })
 })
 

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { columnTable } from '../core/diff.ts'
-import type { Diagnostic, FileKind, ModelDiff, ProjectModel } from '../core/types.ts'
+import type { ColumnModel, Diagnostic, FileKind, ModelDiff, ProjectModel, RelationModel } from '../core/types.ts'
 
 export type FocusMode = 'all' | 'step' | 'deps'
 
@@ -27,12 +27,37 @@ export type SidePanelTab = 'dbml' | 'views' | 'notes' | 'mssql' | 'mongo' | 'war
 
 export const fileKey = (stepId: string, kind: FileKind) => `${stepId}:${kind}`
 
+export interface GhostColumn {
+  token: number
+  table: string
+  column: ColumnModel
+  /** Posición que tenía la columna en la tabla, para dibujarla en su sitio mientras se desvanece. */
+  index: number
+}
+
+export interface GhostRelation {
+  token: number
+  relation: RelationModel
+}
+
 interface Highlights {
   /** Claves con un token incremental: cambiar el token reinicia la animación. */
   newTables: Record<string, number>
   removedTables: Record<string, number>
   flashColumns: Record<string, number>
   newRelations: Record<string, number>
+  /** Columnas y relaciones eliminadas: se conservan un instante para el fade-out. */
+  removedColumns: Record<string, GhostColumn>
+  removedRelations: Record<string, GhostRelation>
+}
+
+/** Duración del glow de "nuevo" y del parpadeo de columnas. */
+const HIGHLIGHT_MS = 2400
+/** Duración del fade-out de lo eliminado. */
+export const REMOVAL_MS = 420
+
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined' && (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false)
 }
 
 export interface ConflictState {
@@ -101,7 +126,8 @@ interface EditorState {
     visible?: { tables: Set<string>; relations: Set<string>; maxPos: number } | null,
   ): void
   toggleActivity(): void
-  applyDiff(diff: ModelDiff): void
+  /** Marca lo que cambió para animarlo. `prev` permite conservar lo eliminado durante su fade-out. */
+  applyDiff(diff: ModelDiff, prev?: ProjectModel | null): void
   pushToast(toast: Omit<Toast, 'id'>): void
   dismissToast(id: number): void
   requestCenter(tables: string[]): void
@@ -139,7 +165,14 @@ function computeRelated(model: ProjectModel | null, key: string | null): Set<str
   return related
 }
 
-const emptyHighlights = (): Highlights => ({ newTables: {}, removedTables: {}, flashColumns: {}, newRelations: {} })
+const emptyHighlights = (): Highlights => ({
+  newTables: {},
+  removedTables: {},
+  flashColumns: {},
+  newRelations: {},
+  removedColumns: {},
+  removedRelations: {},
+})
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   projectId: null,
@@ -271,35 +304,76 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   toggleActivity() {
     set({ activityOpen: !get().activityOpen })
   },
-  applyDiff(diff) {
+  applyDiff(diff, prev) {
     const h = get().highlights
     const token = next()
     const newTables = { ...h.newTables }
     const removedTables = { ...h.removedTables }
     const flashColumns = { ...h.flashColumns }
     const newRelations = { ...h.newRelations }
+    const removedColumns = { ...h.removedColumns }
+    const removedRelations = { ...h.removedRelations }
     const added = new Set(diff.tables.added)
-    for (const t of diff.tables.added) newTables[t] = token
-    for (const t of diff.tables.removed) removedTables[t] = token
+    const removed = new Set(diff.tables.removed)
+    const animateRemovals = !prefersReducedMotion()
+
+    for (const t of diff.tables.added) {
+      newTables[t] = token
+      delete removedTables[t]
+    }
     for (const c of [...diff.columns.added, ...diff.columns.changed]) {
       if (!added.has(columnTable(c))) flashColumns[c] = token
+      delete removedColumns[c]
     }
-    for (const r of diff.relations.added) newRelations[r] = token
-    set({ highlights: { newTables, removedTables, flashColumns, newRelations } })
-    // Limpia las marcas cuando termina la animación.
+    for (const r of diff.relations.added) {
+      newRelations[r] = token
+      delete removedRelations[r]
+    }
+    if (animateRemovals) {
+      for (const t of diff.tables.removed) removedTables[t] = token
+      if (prev) {
+        const prevTables = new Map(prev.tables.map((t) => [t.key, t]))
+        for (const c of diff.columns.removed) {
+          const tableKey = columnTable(c)
+          if (removed.has(tableKey)) continue
+          const table = prevTables.get(tableKey)
+          const index = table?.columns.findIndex((col) => `${tableKey}.${col.name}` === c) ?? -1
+          if (table && index >= 0) removedColumns[c] = { token, table: tableKey, column: table.columns[index], index }
+        }
+        const prevRelations = new Map(prev.relations.map((r) => [r.id, r]))
+        for (const id of diff.relations.removed) {
+          const relation = prevRelations.get(id)
+          if (relation) removedRelations[id] = { token, relation }
+        }
+      }
+    }
+    set({ highlights: { newTables, removedTables, flashColumns, newRelations, removedColumns, removedRelations } })
+
+    // Limpia las marcas cuando termina cada animación.
+    const prune = <T,>(rec: Record<string, T>, tokenOf: (v: T) => number) =>
+      Object.fromEntries(Object.entries(rec).filter(([, v]) => tokenOf(v) !== token))
     setTimeout(() => {
       const cur = get().highlights
-      const prune = (rec: Record<string, number>) =>
-        Object.fromEntries(Object.entries(rec).filter(([, v]) => v !== token))
       set({
         highlights: {
-          newTables: prune(cur.newTables),
-          removedTables: prune(cur.removedTables),
-          flashColumns: prune(cur.flashColumns),
-          newRelations: prune(cur.newRelations),
+          ...cur,
+          removedTables: prune(cur.removedTables, (v) => v),
+          removedColumns: prune(cur.removedColumns, (v) => v.token),
+          removedRelations: prune(cur.removedRelations, (v) => v.token),
         },
       })
-    }, 2400)
+    }, REMOVAL_MS)
+    setTimeout(() => {
+      const cur = get().highlights
+      set({
+        highlights: {
+          ...cur,
+          newTables: prune(cur.newTables, (v) => v),
+          flashColumns: prune(cur.flashColumns, (v) => v),
+          newRelations: prune(cur.newRelations, (v) => v),
+        },
+      })
+    }, HIGHLIGHT_MS)
   },
   pushToast(toast) {
     const id = next()

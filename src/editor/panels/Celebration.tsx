@@ -4,10 +4,10 @@ import { useMemo } from 'react'
 export function Celebration({ color }: { color: string }) {
   const particles = useMemo(
     () =>
-      Array.from({ length: 16 }, (_, i) => {
-        const angle = (i / 16) * Math.PI * 2 + ((i * 7) % 5) * 0.08
-        const dist = 38 + ((i * 13) % 5) * 9
-        return { dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist, size: 4 + (i % 3) * 2, delay: (i % 4) * 30 }
+      Array.from({ length: 22 }, (_, i) => {
+        const angle = (i / 22) * Math.PI * 2 + ((i * 7) % 5) * 0.09
+        const dist = 56 + ((i * 13) % 6) * 12
+        return { dx: Math.cos(angle) * dist, dy: Math.sin(angle) * dist * 0.75, size: 5 + (i % 3) * 2, delay: (i % 4) * 25 }
       }),
     [],
   )
@@ -16,12 +16,13 @@ export function Celebration({ color }: { color: string }) {
       {particles.map((p, i) => (
         <span
           key={i}
-          className="sdb-particle absolute rounded-full"
+          className="sdb-particle absolute"
           style={
             {
               width: p.size,
               height: p.size,
-              background: i % 3 === 0 ? '#FFC53D' : color,
+              background: i % 4 === 0 ? '#FFC53D' : color,
+              borderRadius: i % 3 === 0 ? 2 : 999,
               '--dx': `${p.dx}px`,
               '--dy': `${p.dy}px`,
               animationDelay: `${p.delay}ms`,

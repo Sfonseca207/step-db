@@ -1,6 +1,6 @@
 import type { Edge, Node } from '@xyflow/react'
-import type { Diagnostic, ProjectModel, RelationModel, TableModel } from '../../core/types.ts'
-import type { StepMeta } from '../store.ts'
+import type { ColumnModel, Diagnostic, ProjectModel, RelationModel, TableModel } from '../../core/types.ts'
+import type { GhostColumn, StepMeta } from '../store.ts'
 
 export interface Point {
   x: number
@@ -19,7 +19,18 @@ export interface ColumnRow {
   depth: number
   /** Fila sintética de un subdocumento Mongo no declarado (p. ej. `respuesta`). */
   synthetic: boolean
+  column?: ColumnModel
+  /** Columna eliminada que se está desvaneciendo. */
+  removing?: boolean
 }
+
+/** Lo eliminado que se sigue dibujando durante su fade-out. */
+export interface Ghosts {
+  columns: GhostColumn[]
+  relations: RelationModel[]
+}
+
+export const NO_GHOSTS: Ghosts = { columns: [], relations: [] }
 
 export interface TableNodeData extends Record<string, unknown> {
   table: TableModel
@@ -42,6 +53,8 @@ export interface RelationEdgeData extends Record<string, unknown> {
   toColor: string
   /** El lado 1 es opcional (0..1) porque la FK admite nulos. */
   optionalOne: boolean
+  /** Relación eliminada que se está desvaneciendo. */
+  removing: boolean
   sourceDir: 1 | -1
   targetDir: 1 | -1
 }
@@ -52,9 +65,10 @@ const HEADER_H = 38
 const ROW_H = 22
 
 /** Filas visibles de una tabla: los campos punteados de Mongo se anidan. */
-export function columnRows(table: TableModel): ColumnRow[] {
+export function columnRows(table: TableModel, removing?: ReadonlySet<string>): ColumnRow[] {
+  const flag = (name: string) => (removing?.has(name) ? { removing: true } : {})
   if (table.store !== 'mongo') {
-    return table.columns.map((c) => ({ name: c.name, label: c.name, depth: 0, synthetic: false }))
+    return table.columns.map((c) => ({ name: c.name, label: c.name, depth: 0, synthetic: false, column: c, ...flag(c.name) }))
   }
   const declared = new Set(table.columns.map((c) => c.name))
   const rows: ColumnRow[] = []
@@ -69,7 +83,13 @@ export function columnRows(table: TableModel): ColumnRow[] {
       }
     }
     emitted.add(c.name)
-    rows.push({ name: c.name, label: parts[parts.length - 1], depth: parts.length - 1, synthetic: false })
+    rows.push({ name: c.name, label: parts[parts.length - 1], depth: parts.length - 1, synthetic: false, column: c, ...flag(c.name) })
+  }
+  // Un subdocumento sintético cuyas hijas se están eliminando todas también se desvanece.
+  for (const row of rows) {
+    if (!row.synthetic) continue
+    const children = rows.filter((r) => !r.synthetic && r.name.startsWith(`${row.name}.`))
+    if (children.length > 0 && children.every((r) => r.removing)) row.removing = true
   }
   return rows
 }
@@ -91,6 +111,7 @@ export function buildNodes(
   steps: Record<string, StepMeta>,
   positions: Record<string, Point>,
   warnings: Diagnostic[],
+  ghosts: Ghosts = NO_GHOSTS,
 ): TableNode[] {
   const fkByTable = new Map<string, Set<string>>()
   const handleByTable = new Map<string, Set<string>>()
@@ -104,6 +125,13 @@ export function buildNodes(
     add(handleByTable, r.from.table, r.from.columns)
     add(handleByTable, r.to.table, r.to.columns)
   }
+  // Las relaciones que se desvanecen todavía necesitan sus handles.
+  for (const r of ghosts.relations) {
+    add(handleByTable, r.from.table, r.from.columns)
+    add(handleByTable, r.to.table, r.to.columns)
+  }
+  const ghostColumns = new Map<string, GhostColumn[]>()
+  for (const g of ghosts.columns) ghostColumns.set(g.table, [...(ghostColumns.get(g.table) ?? []), g])
   const warnByTable = new Map<string, Diagnostic[]>()
   for (const w of warnings) {
     if (!w.table) continue
@@ -114,8 +142,21 @@ export function buildNodes(
 
   return model.tables.map((t) => {
     const step = steps[t.stepId]
+    // Columnas eliminadas: se dibujan en su posición original mientras se desvanecen.
+    let display = t
+    const removing = new Set<string>()
+    const gs = ghostColumns.get(t.key)
+    if (gs) {
+      const cols = [...t.columns]
+      for (const g of [...gs].sort((x, y) => x.index - y.index)) {
+        if (cols.some((c) => c.name === g.column.name)) continue
+        cols.splice(Math.min(g.index, cols.length), 0, g.column)
+        removing.add(g.column.name)
+      }
+      display = { ...t, columns: cols }
+    }
     const columnStepColors: TableNodeData['columnStepColors'] = {}
-    for (const c of t.columns) {
+    for (const c of display.columns) {
       if (c.stepId !== t.stepId && steps[c.stepId]) {
         columnStepColors[c.name] = { color: steps[c.stepId].color, slug: steps[c.stepId].slug }
       }
@@ -133,7 +174,7 @@ export function buildNodes(
         color: step?.color ?? '#94A3B8',
         stepNumber: step?.number ?? '··',
         stepName: step?.name ?? '',
-        rows: columnRows(t),
+        rows: columnRows(display, removing),
         columnStepColors,
         fkColumns: [...(fkByTable.get(t.key) ?? [])],
         handleColumns: [...(handleByTable.get(t.key) ?? [])],
@@ -145,13 +186,14 @@ export function buildNodes(
 
 /** Aristas columna a columna; cada extremo usa el lado más cercano de su nodo. */
 export function buildEdges(
-  model: ProjectModel,
+  relations: readonly RelationModel[],
+  tables: ReadonlyMap<string, TableModel>,
   steps: Record<string, StepMeta>,
   centers: Map<string, { cx: number; left: number; right: number }>,
+  removing: ReadonlySet<string> = new Set(),
 ): RelationEdge[] {
-  const tables = new Map(model.tables.map((t) => [t.key, t]))
   const edges: RelationEdge[] = []
-  for (const r of model.relations) {
+  for (const r of relations) {
     const from = tables.get(r.from.table)
     const to = tables.get(r.to.table)
     if (!from || !to) continue
@@ -182,6 +224,7 @@ export function buildEdges(
         fromColor: steps[from.stepId]?.color ?? '#94A3B8',
         toColor: steps[to.stepId]?.color ?? '#94A3B8',
         optionalOne,
+        removing: removing.has(r.id),
         sourceDir: sourceSide === 'R' ? 1 : -1,
         targetDir: targetSide === 'R' ? 1 : -1,
       },

@@ -27,7 +27,7 @@ function RelationEdgeComponent(props: EdgeProps<RelationEdgeType>) {
     (s) => !!data && !!s.focusSet && (!s.focusSet.has(data.relation.from.table) || !s.focusSet.has(data.relation.to.table)),
   )
   if (!data) return null
-  const { relation, fromColor, toColor, optionalOne, sourceDir, targetDir } = data
+  const { relation, fromColor, toColor, optionalOne, sourceDir, targetDir, removing } = data
   const logical = relation.kind === 'logical'
   const involved = selectedTable !== null && (relation.from.table === selectedTable || relation.to.table === selectedTable)
   const dimmed = dimmedByFocus || (selectedTable !== null && !involved)
@@ -53,7 +53,7 @@ function RelationEdgeComponent(props: EdgeProps<RelationEdgeType>) {
   const width = hovered ? 3.2 : involved ? 2.4 : 1.8
 
   return (
-    <g className={`sdb-edge ${dimmed ? 'sdb-edge-dimmed' : ''} ${hovered ? 'sdb-edge-hover' : ''}`}>
+    <g className={`sdb-edge ${dimmed ? 'sdb-edge-dimmed' : ''} ${hovered ? 'sdb-edge-hover' : ''} ${removing ? 'sdb-edge-out' : ''}`}>
       {!sameColor && (
         <defs>
           <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" x1={sx} y1={sourceY} x2={tx} y2={targetY}>
@@ -80,7 +80,7 @@ function RelationEdgeComponent(props: EdgeProps<RelationEdgeType>) {
       {logical && (
         <EdgeLabelRenderer>
           <div
-            className={`sdb-edge-label nodrag nopan ${dimmed ? 'opacity-20' : ''}`}
+            className={`sdb-edge-label nodrag nopan ${dimmed ? 'sdb-edge-label-dimmed' : ''} ${removing ? 'sdb-edge-out' : ''}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
             title={`Referencia lógica: no hay FK; la consistencia la garantiza la aplicación. Indexar ${relation.from.columns.join(', ')} en Mongo.`}
           >

@@ -69,7 +69,7 @@ export function useModelSync(project: ProjectDto | undefined) {
       if (result.model) {
         if (prev) {
           const diff = diffModels(prev, result.model)
-          if (!isEmptyDiff(diff)) applyDiff(diff)
+          if (!isEmptyDiff(diff)) applyDiff(diff, prev)
         }
         setModel(result.model, [])
         setWarnings(lintModel(result.model, project.conventions))

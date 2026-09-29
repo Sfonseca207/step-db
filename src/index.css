@@ -38,6 +38,49 @@ body {
   }
 }
 
+/* Animaciones de interfaz: 150–400 ms, con propósito (SPEC §10.2) */
+@keyframes sdb-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes sdb-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+@keyframes sdb-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sdb-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+.sdb-rise {
+  animation: sdb-rise 320ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+.sdb-pop {
+  animation: sdb-pop 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sdb-overlay {
+  animation: sdb-fade-in 180ms ease-out;
+}
+.sdb-shake {
+  animation: sdb-shake 260ms ease-in-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

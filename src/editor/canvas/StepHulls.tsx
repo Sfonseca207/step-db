@@ -29,7 +29,7 @@ export function StepHulls({ nodes }: { nodes: TableNode[] }) {
         return (
           <div
             key={stepId}
-            className="pointer-events-none absolute rounded-[28px] transition-all duration-300"
+            className="sdb-hull pointer-events-none absolute rounded-[28px]"
             style={{
               transform: `translate(${b.x1 - PAD}px, ${b.y1 - PAD - 18}px)`,
               width: b.x2 - b.x1 + PAD * 2,

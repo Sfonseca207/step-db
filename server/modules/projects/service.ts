@@ -1,9 +1,9 @@
-import { asc, count, desc, eq, inArray } from 'drizzle-orm'
+import { asc, desc, eq, inArray } from 'drizzle-orm'
 import type { ProjectDto, ProjectSummaryDto, StepDto, StepFileDto, WriteSource } from '../../../src/core/api.ts'
 import { DEFAULT_CONVENTIONS, parseConventions, parseLayout, type Conventions, type Layout } from '../../../src/core/schemas.ts'
 import { FILE_KINDS, type FileKind } from '../../../src/core/types.ts'
 import { db } from '../../db/client.ts'
-import { project, revision, step, stepFile, type StepRow } from '../../db/schema.ts'
+import { project, step, stepFile, type StepRow } from '../../db/schema.ts'
 import { hub } from '../../realtime/hub.ts'
 import { loadGasAppSeed } from '../../seed/gasapp/index.ts'
 import { insertStep } from '../steps/service.ts'
@@ -54,25 +54,26 @@ export async function loadSteps(projectId: string): Promise<StepDto[]> {
 }
 
 export async function listProjects(userId: string): Promise<ProjectSummaryDto[]> {
-  const rows = await db
-    .select({
-      id: project.id,
-      name: project.name,
-      description: project.description,
-      createdAt: project.createdAt,
-      updatedAt: project.updatedAt,
-      stepCount: count(step.id),
-    })
-    .from(project)
-    .leftJoin(step, eq(step.projectId, project.id))
-    .where(eq(project.ownerId, userId))
-    .groupBy(project.id)
-    .orderBy(desc(project.updatedAt))
+  const rows = await db.select().from(project).where(eq(project.ownerId, userId)).orderBy(desc(project.updatedAt))
+  if (rows.length === 0) return []
+  const steps = await db
+    .select({ projectId: step.projectId, color: step.color })
+    .from(step)
+    .where(
+      inArray(
+        step.projectId,
+        rows.map((r) => r.id),
+      ),
+    )
+    .orderBy(asc(step.position))
+  const colors = new Map<string, string[]>()
+  for (const s of steps) colors.set(s.projectId, [...(colors.get(s.projectId) ?? []), s.color])
   return rows.map((r) => ({
     id: r.id,
     name: r.name,
     description: r.description,
-    stepCount: Number(r.stepCount),
+    stepCount: colors.get(r.id)?.length ?? 0,
+    stepColors: colors.get(r.id) ?? [],
     createdAt: r.createdAt.toISOString(),
     updatedAt: r.updatedAt.toISOString(),
   }))
@@ -107,7 +108,7 @@ export async function createProject(userId: string, input: CreateProjectInput): 
       .insert(project)
       .values({ ownerId: userId, name: input.name, description: input.description ?? null, conventions: DEFAULT_CONVENTIONS })
       .returning()
-    const first = await insertStep(tx, p.id, { name: 'Inicio', description: 'Primer step del modelo' }, [])
+    const first = await insertStep(tx, p.id, { name: 'Inicio', description: 'Primer step del modelo' }, [], undefined, userId)
     await tx.update(project).set({ activeStepId: first.id }).where(eq(project.id, p.id))
     return p.id
   })
@@ -138,21 +139,10 @@ export async function createExampleProject(userId: string): Promise<ProjectDto> 
         used,
         s.files,
         userId,
+        'seed',
       )
       used.push(created.color)
       lastId = created.id
-      for (const kind of FILE_KINDS) {
-        if (!s.files[kind]) continue
-        await tx.insert(revision).values({
-          stepId: created.id,
-          kind,
-          version: 1,
-          content: s.files[kind],
-          source: 'seed',
-          authorId: userId,
-          summary: 'Contenido inicial del ejemplo',
-        })
-      }
     }
     await tx.update(project).set({ activeStepId: lastId }).where(eq(project.id, p.id))
     return p.id

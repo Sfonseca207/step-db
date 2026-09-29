@@ -64,7 +64,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </div>
           <p className="text-center text-sm text-slate-500">Modela tu base de datos step por step.</p>
         </div>
-        <form onSubmit={onSubmit} className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+        <form onSubmit={onSubmit} className="sdb-rise rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="mb-4 text-lg font-semibold text-slate-900">{mode === 'login' ? 'Iniciar sesión' : 'Crear cuenta'}</h1>
           {mode === 'register' && (
             <div className="mb-3">
@@ -80,7 +80,10 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               required
               className="input"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(e) => {
+                setEmail(e.target.value)
+                setError(null)
+              }}
               autoComplete="email"
             />
           </div>
@@ -93,12 +96,15 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
               minLength={8}
               className="input"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value)
+                setError(null)
+              }}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             />
           </div>
           {error && (
-            <p role="alert" className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="sdb-shake mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
             </p>
           )}

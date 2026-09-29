@@ -14,6 +14,8 @@ const SOURCE: Record<string, { label: string; cls: string }> = {
   seed: { label: 'Ejemplo', cls: 'bg-amber-100 text-amber-700' },
 }
 
+const KIND_LABEL: Record<FileKind, string> = { model: 'SQL Server', mongo: 'Mongo', views: 'Vistas', notes: 'Notas' }
+
 const LANG: Record<FileKind, 'dbml' | 'sql' | 'markdown'> = { model: 'dbml', mongo: 'dbml', views: 'sql', notes: 'markdown' }
 
 /** Historial del archivo (RF-35): vista previa y restaurar (crea una revisión nueva). */
@@ -45,7 +47,7 @@ export function HistoryPanel({ project, step }: { project: ProjectDto; step: Ste
             }}
             className={`rounded-md px-2 py-0.5 text-xs font-medium ${kind === k ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'}`}
           >
-            {k}
+            {KIND_LABEL[k]}
           </button>
         ))}
       </div>

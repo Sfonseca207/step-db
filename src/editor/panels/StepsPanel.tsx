@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState, type DragEvent } from 'react'
 import type { ProjectDto, StepDto } from '../../core/api.ts'
-import { nextStepColor } from '../../core/palette.ts'
+import { contrastText, nextStepColor } from '../../core/palette.ts'
 import { foreignColumnsOfStep } from '../../core/model.ts'
 import { stepNumber } from '../../core/slug.ts'
 import { IconPlus } from '../../components/icons.tsx'
@@ -73,7 +73,9 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
       setDialog(null)
       const before = project.steps.find((x) => x.id === s.id)
       if (v.values.status === 'completado' && before?.status !== 'completado') {
-        setCelebrate({ stepId: s.id, token: Date.now() })
+        const token = Date.now()
+        setCelebrate({ stepId: s.id, token })
+        setTimeout(() => setCelebrate((c) => (c?.token === token ? null : c)), 1200)
       }
       await refetch()
     },
@@ -146,7 +148,7 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
               }}
             >
               <span
-                className={`absolute top-4 left-[9px] h-3.5 w-3.5 rounded-full border-2 border-white ${active ? 'sdb-pulse' : ''}`}
+                className={`absolute top-4 left-[9px] h-3.5 w-3.5 rounded-full border-2 border-white transition-colors duration-300 ${active ? 'sdb-pulse' : ''}`}
                 style={{ background: s.color, '--pulse': s.color } as React.CSSProperties}
                 title={active ? 'Step activo' : undefined}
               />
@@ -169,17 +171,19 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                     }
                   }}
                 >
-                <span className="flex items-center gap-2">
+                <span className="flex items-start gap-2">
                   <span
-                    className="rounded-md px-1.5 py-px text-[10.5px] font-bold text-white tabular-nums"
-                    style={{ background: s.color }}
+                    className="mt-px rounded-md px-1.5 py-px text-[10.5px] font-bold tabular-nums transition-colors duration-300"
+                    style={{ background: s.color, color: contrastText(s.color) }}
                   >
                     {stepNumber(s.position)}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800" title={s.slug}>
+                  <span className="line-clamp-2 min-w-0 flex-1 text-sm leading-snug font-semibold text-slate-800" title={s.slug}>
                     {s.name}
                   </span>
-                  {active && <span className="rounded bg-slate-900 px-1.5 text-[10px] font-semibold text-white">activo</span>}
+                  {active && (
+                    <span className="mt-0.5 rounded bg-slate-900 px-1.5 text-[10px] leading-4 font-semibold text-white">activo</span>
+                  )}
                   <span
                     className={`text-xs ${s.status === 'completado' ? 'text-emerald-600' : 'text-sky-600'}`}
                     title={s.status === 'completado' ? 'Completado' : 'En curso'}
@@ -197,14 +201,14 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                 </span>
                 {st && st.foreign.length > 0 && (
                   <span
-                    className="block mt-1 flex items-center gap-1 text-[11px] text-slate-500"
+                    className="mt-1 flex items-center gap-1 text-[11px] text-slate-500"
                     title={st.foreign.map((f) => `${f.table}.${f.column}`).join('\n')}
                   >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />+{st.foreign.length}{' '}
+                    <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: s.color }} />+{st.foreign.length}{' '}
                     {st.foreign.length === 1 ? 'columna' : 'columnas'} en tablas de otros steps
                   </span>
                 )}
-                {s.description && <span className="block mt-1 line-clamp-2 text-[11.5px] leading-snug text-slate-500">{s.description}</span>}
+                {s.description && <span className="mt-1 line-clamp-2 text-[11.5px] leading-snug text-slate-500">{s.description}</span>}
                 </button>
                 <div className="absolute top-1.5 right-1.5 hidden gap-0.5 rounded-lg bg-white/95 p-0.5 shadow-sm group-hover:flex group-focus-within:flex">
                   {!active && (

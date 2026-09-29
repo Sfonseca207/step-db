@@ -38,6 +38,8 @@ export interface ProjectSummaryDto {
   name: string
   description: string | null
   stepCount: number
+  /** Colores de los steps en orden cronológico. */
+  stepColors: string[]
   createdAt: string
   updatedAt: string
 }

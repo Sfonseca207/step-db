@@ -8,6 +8,15 @@
   background: transparent;
 }
 
+.sdb-node {
+  transition: opacity 250ms ease, filter 250ms ease;
+}
+/* Fuera de foco: ~20 % de opacidad y escala de grises (RF-15) */
+.sdb-node.sdb-dimmed {
+  opacity: 0.2;
+  filter: grayscale(1);
+}
+
 .sdb-table {
   min-width: 230px;
   max-width: 420px;
@@ -15,17 +24,14 @@
   border-radius: 10px;
   overflow: hidden;
   font-size: 12px;
+  background: var(--step-soft);
   box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 14px -6px rgb(15 23 42 / 0.12);
-  transition: opacity 250ms ease, filter 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
+  transition: box-shadow 250ms ease, border-color 400ms ease, background-color 400ms ease;
 }
 .sdb-table.sdb-mongo {
   border-style: dashed;
   border-width: 2px;
   border-radius: 18px;
-}
-.sdb-table.sdb-dimmed {
-  opacity: 0.2;
-  filter: grayscale(1);
 }
 .sdb-table.sdb-selected {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--step) 35%, transparent), 0 10px 30px -10px rgb(15 23 42 / 0.35);
@@ -103,6 +109,22 @@
 .sdb-row-flash {
   animation: sdb-flash 1.8s ease-out;
 }
+/* Columna eliminada: se desvanece antes de desaparecer (RF-41) */
+.sdb-row-out {
+  pointer-events: none;
+  animation: sdb-fade-out 380ms ease-in forwards;
+}
+.sdb-row-out .sdb-row-name {
+  text-decoration: line-through;
+}
+@keyframes sdb-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
 @keyframes sdb-flash {
   0%,
   30% {
@@ -158,11 +180,23 @@
 }
 
 /* Aristas */
+/* Recolorear un step anima también sus relaciones (RF-12) */
 .sdb-edge path {
-  transition: opacity 250ms ease;
+  transition: opacity 250ms ease, stroke 400ms ease;
+}
+.sdb-edge stop {
+  transition: stop-color 400ms ease;
 }
 .sdb-edge-dimmed {
   opacity: 0.12;
+}
+.sdb-edge-label-dimmed {
+  opacity: 0.2;
+}
+/* Relación eliminada: se desvanece antes de desaparecer (RF-41) */
+.sdb-edge-out {
+  pointer-events: none;
+  animation: sdb-fade-out 380ms ease-in forwards;
 }
 .sdb-edge-draw {
   stroke-dasharray: 1;
@@ -203,8 +237,10 @@
   .sdb-edge-ants,
   .sdb-edge-ants-logical,
   .sdb-edge-draw,
+  .sdb-edge-out,
   .sdb-table.sdb-new,
-  .sdb-row-flash {
+  .sdb-row-flash,
+  .sdb-row-out {
     animation: none !important;
   }
   .sdb-edge-draw {
@@ -231,21 +267,28 @@
 
 /* Micro-celebración (P2) */
 .sdb-particle {
-  animation: sdb-burst 900ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  opacity: 0;
+  animation: sdb-burst 900ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 @keyframes sdb-burst {
-  from {
-    transform: translate(0, 0) scale(1);
+  0% {
+    transform: translate(0, 0) scale(0.4);
+    opacity: 0;
+  }
+  12% {
     opacity: 1;
   }
-  to {
-    transform: translate(var(--dx), var(--dy)) scale(0.3);
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0.5) rotate(120deg);
     opacity: 0;
   }
 }
 
 .sdb-reveal-line {
-  background: #fef9c3;
+  animation: sdb-flash 1.6s ease-out forwards;
 }
 
 /* Paneles redimensionables */
@@ -287,18 +330,31 @@
 .sdb-replay-label {
   animation: sdb-label-in 450ms cubic-bezier(0.16, 1, 0.3, 1);
 }
+/* El centrado horizontal lo hace la propiedad `translate`; aquí solo se anima `transform`. */
 @keyframes sdb-label-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -12px) scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0) scale(1);
+    transform: translateY(-12px) scale(0.94);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .sdb-replay-label {
+    animation: none;
+  }
+}
+
+/* Fondos por step (RF-29) */
+.sdb-hull {
+  animation: sdb-hull-in 300ms ease-out;
+  transition: background-color 400ms ease, border-color 400ms ease;
+}
+@keyframes sdb-hull-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdb-hull {
     animation: none;
   }
 }

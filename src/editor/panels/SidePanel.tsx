@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { ProjectDto } from '../../core/api.ts'
+import { LINT_RULE_LABELS } from '../../core/lint.ts'
 import { formatDiagnostic } from '../../core/model.ts'
 import type { DbmlKind, FileKind } from '../../core/types.ts'
 import { setDraftContent } from '../drafts.ts'
@@ -200,7 +201,9 @@ export function SidePanel({ project }: { project: ProjectDto }) {
                         if (w.table) useEditorStore.getState().requestCenter([w.table])
                       }}
                     >
-                      <span className="font-mono text-[10.5px] text-amber-700">{w.code}</span>
+                      <span className="text-[10.5px] font-semibold tracking-wide text-amber-700 uppercase">
+                        {LINT_RULE_LABELS[w.code ?? ''] ?? w.code}
+                      </span>
                       <span className="block">{formatDiagnostic({ ...w, stepSlug: project.steps.find((s) => s.id === w.stepId)?.slug })}</span>
                     </button>
                   </li>

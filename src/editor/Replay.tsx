@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { IconClose, IconNext, IconPause, IconPlay } from '../components/icons.tsx'
+import { contrastText } from '../core/palette.ts'
 import type { ModelDiff } from '../core/types.ts'
 import { canvasActions } from './canvas/actions.ts'
 import { useEditorStore } from './store.ts'
@@ -89,8 +90,8 @@ export function ReplayOverlay({ workDates }: { workDates: Record<string, string>
       {step && (
         <div
           key={step.id}
-          className="sdb-replay-label pointer-events-none absolute top-5 left-1/2 z-30 -translate-x-1/2 rounded-2xl px-5 py-2 text-center text-white shadow-lg"
-          style={{ background: step.color }}
+          className="sdb-replay-label pointer-events-none absolute top-5 left-1/2 z-30 -translate-x-1/2 rounded-2xl px-5 py-2 text-center shadow-lg"
+          style={{ background: step.color, color: contrastText(step.color) }}
         >
           <p className="text-[11px] font-semibold tracking-wider uppercase opacity-80">Step {step.number}</p>
           <p className="text-lg leading-tight font-semibold">

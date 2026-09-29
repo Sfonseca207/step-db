@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, ne, or, sql } from 'drizzle-orm'
 import type { ActivityDto, RevisionDto, WriteFileConflict, WriteFileInvalid, WriteFileOk, WriteSource } from '../../../src/core/api.ts'
 import { diffModels, summarizeDiff } from '../../../src/core/diff.ts'
 import { lintModel } from '../../../src/core/lint.ts'
@@ -172,7 +172,8 @@ export async function listActivity(userId: string, projectId: string, limit = 30
     .from(revision)
     .innerJoin(step, eq(step.id, revision.stepId))
     .leftJoin(user, eq(user.id, revision.authorId))
-    .where(eq(step.projectId, projectId))
+    // Las versiones iniciales vacías no son actividad.
+    .where(and(eq(step.projectId, projectId), or(gt(revision.version, 1), ne(revision.content, ''))))
     .orderBy(desc(revision.createdAt))
     .limit(limit)
   return rows.map((row) => ({

@@ -26,6 +26,16 @@ function warn(table: TableModel, code: string, message: string, line?: number): 
   }
 }
 
+/** Nombre legible de cada regla del linter. */
+export const LINT_RULE_LABELS: Record<string, string> = {
+  'no-pk': 'Tabla sin clave primaria',
+  case: 'Nombre fuera de convención',
+  'fk-without-ref': 'Parece FK pero no tiene Ref',
+  'fk-without-index': 'FK sin índice',
+  'logical-ref-without-index': 'Referencia lógica sin índice',
+  'sql-log-table': 'Log en SQL',
+}
+
 /** ¿Las columnas están cubiertas (como prefijo) por la PK, un índice o un `unique`? */
 function isIndexed(table: TableModel, columns: string[]): boolean {
   if (columns.length === 1) {

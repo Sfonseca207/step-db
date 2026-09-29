@@ -16,7 +16,7 @@ import type { Layout } from '../../core/schemas.ts'
 import type { ProjectModel } from '../../core/types.ts'
 import { useEditorStore, type StepMeta } from '../store.ts'
 import { canvasActions } from './actions.ts'
-import { buildEdges, buildNodes, estimateSize, type Point, type RelationEdge as RelationEdgeT, type Size, type TableNode as TableNodeT } from './graph.ts'
+import { buildEdges, buildNodes, estimateSize, type Ghosts, type Point, type RelationEdge as RelationEdgeT, type Size, type TableNode as TableNodeT } from './graph.ts'
 import { autoPlace, elkLayout } from './layout.ts'
 import { RelationEdge } from './RelationEdge.tsx'
 import { StepHulls } from './StepHulls.tsx'
@@ -40,6 +40,15 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   const steps = useEditorStore((s) => s.steps)
   const warnings = useEditorStore((s) => s.warnings)
   const removedTables = useEditorStore((s) => s.highlights.removedTables)
+  const removedColumns = useEditorStore((s) => s.highlights.removedColumns)
+  const removedRelations = useEditorStore((s) => s.highlights.removedRelations)
+  const ghosts = useMemo<Ghosts>(
+    () => ({
+      columns: Object.values(removedColumns),
+      relations: Object.values(removedRelations).map((g) => g.relation),
+    }),
+    [removedColumns, removedRelations],
+  )
   const replayVisible = useEditorStore((s) => s.replayVisible)
   const replayRelations = useEditorStore((s) => s.replayRelations)
   const showHulls = useEditorStore((s) => s.showHulls)
@@ -57,6 +66,12 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   /** Encuadre pendiente (sin viewport guardado o tras el layout inicial). */
   const pendingFit = useRef(!layout.viewport)
   const animRef = useRef<number | null>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  /** Proporción del canvas (ancho / alto) para acomodar los bloques de steps. */
+  const aspectOf = useCallback(() => {
+    const el = containerRef.current
+    return el && el.clientHeight > 0 ? el.clientWidth / el.clientHeight : 1.6
+  }, [])
 
   // Posiciones que llegan del servidor (otra pestaña) para tablas que no se están arrastrando.
   useEffect(() => {
@@ -130,7 +145,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
       const order = Object.values(steps)
         .sort((a, b) => a.position - b.position)
         .map((s) => s.id)
-      void elkLayout(model, sizes, true, order).then((placed) => {
+      void elkLayout(model, sizes, true, order, aspectOf()).then((placed) => {
         Object.assign(positionsRef.current, placed)
         setNodes(buildNodes(model, steps, positionsRef.current, useEditorStore.getState().warnings))
         setGraphModel(model)
@@ -149,18 +164,18 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
 
     setNodes((prev) => {
       const prevById = new Map(prev.map((n) => [n.id, n]))
-      const built = buildNodes(model, steps, positionsRef.current, warnings).map((n) => {
+      const built = buildNodes(model, steps, positionsRef.current, warnings, ghosts).map((n) => {
         const old = prevById.get(n.id)
         return old ? { ...n, position: old.position, selected: old.selected, measured: old.measured } : n
       })
       // Tablas eliminadas: se conservan un momento para el fade-out.
       const keys = new Set(built.map((n) => n.id))
-      const ghosts = prev.filter((n) => !keys.has(n.id) && removedTables[n.id] !== undefined)
-      return [...built, ...ghosts]
+      const fadingTables = prev.filter((n) => !keys.has(n.id) && removedTables[n.id] !== undefined)
+      return [...built, ...fadingTables]
     })
     setGraphModel(model)
     lastModelRef.current = model
-  }, [model, steps, warnings, removedTables, sizesOf, onPersistPositions, fitView])
+  }, [model, steps, warnings, removedTables, ghosts, sizesOf, aspectOf, onPersistPositions, fitView])
 
   // Encuadra cuando los nodos ya están en React Flow (usa el tamaño estimado de los no medidos).
   useEffect(() => {
@@ -200,13 +215,17 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   const edges = useMemo(() => {
     if (!graphModel) return []
     const centers = new Map<string, { cx: number; left: number; right: number }>()
+    // Las tablas salen de los nodos: incluyen las eliminadas que aún se están desvaneciendo.
+    const tables = new Map(nodes.map((n) => [n.id, n.data.table]))
     for (const n of nodes) {
       const w = n.measured?.width ?? estimateSize(n.data.table).width
       centers.set(n.id, { cx: n.position.x + w / 2, left: n.position.x, right: n.position.x + w })
     }
-    return buildEdges(graphModel, steps, centers)
+    const current = new Set(graphModel.relations.map((r) => r.id))
+    const fading = ghosts.relations.filter((r) => !current.has(r.id))
+    return buildEdges([...graphModel.relations, ...fading], tables, steps, centers, new Set(fading.map((r) => r.id)))
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `sidesKey` resume las posiciones relevantes
-  }, [graphModel, steps, sidesKey])
+  }, [graphModel, steps, sidesKey, ghosts])
 
   const visibleNodes = useMemo(
     () => (replayVisible ? nodes.map((n) => ({ ...n, hidden: !replayVisible.has(n.id) })) : nodes),
@@ -228,7 +247,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
       const order = Object.values(steps)
         .sort((a: StepMeta, b: StepMeta) => a.position - b.position)
         .map((s) => s.id)
-      const placed = await elkLayout(model, sizesOf(model), groupByStep, order)
+      const placed = await elkLayout(model, sizesOf(model), groupByStep, order, aspectOf())
       Object.assign(positionsRef.current, placed)
       animateTo(placed)
       onPersistPositions(placed)
@@ -245,7 +264,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
       })
     }
     canvasActions.positions = () => ({ ...positionsRef.current })
-  }, [model, steps, sizesOf, animateTo, onPersistPositions, fitView])
+  }, [model, steps, sizesOf, aspectOf, animateTo, onPersistPositions, fitView])
 
   // Centrar: espera a que las tablas pedidas existan y estén medidas (p. ej. recién creadas por MCP).
   const pendingCenter = useRef<{ tables: string[]; token: number; since: number } | null>(null)
@@ -264,7 +283,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   }, [nodes, centerRequest])
 
   return (
-    <div className="sdb-canvas relative h-full w-full bg-white">
+    <div ref={containerRef} className="sdb-canvas relative h-full w-full bg-white">
       <ReactFlow<TableNodeT, RelationEdgeT>
         nodes={visibleNodes}
         edges={visibleEdges}
@@ -280,6 +299,9 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
           useEditorStore.getState().requestReveal(loc.stepId, loc.kind, loc.startLine)
         }}
         onPaneClick={() => selectTable(null)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') selectTable(null)
+        }}
         onEdgeMouseEnter={(_, e) => {
           const r = e.data?.relation
           if (!r) return
@@ -293,6 +315,8 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
         minZoom={0.1}
         maxZoom={2}
         nodesConnectable={false}
+        // El modelo es code-first: las tablas no se borran desde el canvas.
+        deleteKeyCode={null}
         elementsSelectable
         onlyRenderVisibleElements={nodes.length > 80}
         attributionPosition="top-right"
@@ -316,6 +340,17 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
           </ControlButton>
         </Controls>
       </ReactFlow>
+      {model && model.tables.length === 0 && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
+          <div className="sdb-rise max-w-sm rounded-2xl border border-dashed border-slate-300 bg-white/90 p-6 text-center">
+            <p className="text-sm font-semibold text-slate-800">Este modelo todavía no tiene tablas</p>
+            <p className="mt-1 text-sm text-slate-500">
+              Escribe DBML en el editor, pulsa <b className="font-semibold text-slate-700">Nueva tabla</b> o pídele a Claude que
+              escriba el step por MCP. Lo que guardes aparecerá aquí animado.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

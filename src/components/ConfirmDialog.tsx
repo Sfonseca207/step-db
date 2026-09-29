@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 export function Modal({ children, onClose }: { children: ReactNode; onClose: () => void }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-[2px]"
+      className="sdb-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-[2px]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose()
       }}
@@ -11,7 +11,7 @@ export function Modal({ children, onClose }: { children: ReactNode; onClose: () 
         if (e.key === 'Escape') onClose()
       }}
     >
-      <div role="dialog" aria-modal className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+      <div role="dialog" aria-modal className="sdb-pop w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         {children}
       </div>
     </div>

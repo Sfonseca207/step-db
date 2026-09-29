@@ -98,7 +98,8 @@ export function useRealtime(projectId: string) {
       }
     }
 
-    connect()
+    // Conexión diferida: evita abrir y cerrar un socket en el doble montaje de StrictMode.
+    reconnectTimer = setTimeout(connect, 0)
     return () => {
       closed = true
       if (reconnectTimer) clearTimeout(reconnectTimer)

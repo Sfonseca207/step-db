@@ -77,7 +77,8 @@ export default function ProjectsPage() {
               </button>
             </form>
             <button className="btn" onClick={() => example.mutate()} disabled={example.isPending}>
-              {example.isPending ? 'Creando…' : '✨ Crear proyecto de ejemplo'}
+              <span aria-hidden>✨</span>
+              {example.isPending ? 'Creando…' : 'Crear proyecto de ejemplo'}
             </button>
           </div>
         </div>
@@ -95,11 +96,12 @@ export default function ProjectsPage() {
           {list.map((p, i) => (
             <li
               key={p.id}
-              className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-md"
+              style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+              className="sdb-rise group relative overflow-hidden rounded-2xl border border-slate-200 bg-white transition hover:-translate-y-0.5 hover:shadow-md"
             >
               <div className="flex h-1.5">
-                {Array.from({ length: Math.max(1, Math.min(p.stepCount, 12)) }, (_, k) => (
-                  <span key={k} className="flex-1" style={{ background: STEP_PALETTE[(k + i) % STEP_PALETTE.length] }} />
+                {(p.stepColors.length > 0 ? p.stepColors.slice(0, 24) : [STEP_PALETTE[0]]).map((color, k) => (
+                  <span key={k} className="flex-1" style={{ background: color }} />
                 ))}
               </div>
               <div className="p-4">
@@ -112,13 +114,20 @@ export default function ProjectsPage() {
                     className="flex gap-2"
                   >
                     <input
-                      className="input"
+                      className="input relative z-10"
                       autoFocus
+                      maxLength={120}
                       value={renaming.name}
                       onChange={(e) => setRenaming({ id: p.id, name: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') setRenaming(null)
+                      }}
                       aria-label="Nuevo nombre"
                     />
-                    <button className="btn btn-primary">OK</button>
+                    <button className="btn btn-primary relative z-10">OK</button>
+                    <button type="button" className="btn relative z-10" onClick={() => setRenaming(null)} aria-label="Cancelar">
+                      ✕
+                    </button>
                   </form>
                 ) : (
                   <Link to={`/p/${p.id}`} className="block text-base font-semibold text-slate-900 after:absolute after:inset-0">

@@ -3,6 +3,7 @@ import ELK from 'elkjs/lib/elk-api.js'
 import elkWorkerUrl from 'elkjs/lib/elk-worker.min.js?url'
 import type { ProjectModel } from '../../core/types.ts'
 import type { Point, Size } from './graph.ts'
+import { packBlocks, type Block } from './pack.ts'
 
 let elk: InstanceType<typeof ELK> | null = null
 
@@ -48,39 +49,27 @@ async function layoutFlat(
 
 /**
  * Auto-organizar con ELK `layered`. Agrupado por step: cada step se organiza
- * por separado y los bloques se ubican en orden cronológico (izq. → der.).
+ * por separado y los bloques se ubican en orden cronológico, en las filas que
+ * mejor aprovechan la proporción del canvas (`aspect` = ancho / alto).
  */
 export async function elkLayout(
   model: ProjectModel,
   sizes: Map<string, Size>,
   groupByStep: boolean,
   stepOrder: string[],
+  aspect = 1.6,
 ): Promise<Record<string, Point>> {
   const size = (key: string) => sizes.get(key) ?? { width: 240, height: 160 }
   if (!groupByStep) {
     return (await layoutFlat(model.tables.map((t) => t.key), model, size, 'RIGHT')).positions
   }
-  const out: Record<string, Point> = {}
-  const GAP_X = 140
-  const GAP_Y = 120
-  const MAX_ROW_WIDTH = 2600
-  let x = 0
-  let y = 0
-  let rowHeight = 0
+  const blocks: Block[] = []
   for (const stepId of stepOrder) {
     const keys = model.tables.filter((t) => t.stepId === stepId).map((t) => t.key)
     if (keys.length === 0) continue
-    const block = await layoutFlat(keys, model, size, keys.length > 4 ? 'RIGHT' : 'DOWN')
-    if (x > 0 && x + block.width > MAX_ROW_WIDTH) {
-      x = 0
-      y += rowHeight + GAP_Y
-      rowHeight = 0
-    }
-    for (const [k, p] of Object.entries(block.positions)) out[k] = { x: x + p.x, y: y + p.y }
-    x += block.width + GAP_X
-    rowHeight = Math.max(rowHeight, block.height)
+    blocks.push(await layoutFlat(keys, model, size, keys.length > 4 ? 'RIGHT' : 'DOWN'))
   }
-  return out
+  return packBlocks(blocks, aspect)
 }
 
 interface Rect {

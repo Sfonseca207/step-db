@@ -4,7 +4,7 @@ import { nextStepColor } from '../../../src/core/palette.ts'
 import { makeStepSlug } from '../../../src/core/slug.ts'
 import { FILE_KINDS, type FileKind, type StepStatus } from '../../../src/core/types.ts'
 import { db, type Tx } from '../../db/client.ts'
-import { project, step, stepFile, type StepRow } from '../../db/schema.ts'
+import { project, revision, step, stepFile, type StepRow } from '../../db/schema.ts'
 import { HttpError } from '../../lib/errors.ts'
 import { hub } from '../../realtime/hub.ts'
 import { assertProjectAccess, assertStepAccess } from '../projects/access.ts'
@@ -34,6 +34,7 @@ export async function insertStep(
   usedColors: string[],
   files?: Partial<Record<FileKind, string>>,
   userId?: string,
+  source: WriteSource = 'ui',
 ): Promise<StepRow> {
   const [{ maxPos }] = await tx
     .select({ maxPos: max(step.position) })
@@ -61,6 +62,18 @@ export async function insertStep(
   await tx.insert(stepFile).values(
     FILE_KINDS.map((kind) => ({ stepId: row.id, kind, content: files?.[kind] ?? '', updatedBy: userId ?? null })),
   )
+  // Versión 1 de cada archivo: el historial siempre permite volver al estado inicial.
+  await tx.insert(revision).values(
+    FILE_KINDS.map((kind) => ({
+      stepId: row.id,
+      kind,
+      version: 1,
+      content: files?.[kind] ?? '',
+      source,
+      authorId: userId ?? null,
+      summary: files?.[kind] ? 'Contenido inicial del ejemplo' : 'Archivo vacío',
+    })),
+  )
   return row
 }
 
@@ -81,7 +94,7 @@ export async function createStep(
 ): Promise<StepDto> {
   await assertProjectAccess(userId, projectId)
   const row = await db.transaction(async (tx) => {
-    const created = await insertStep(tx, projectId, { ...input, slug: undefined }, [], undefined, userId)
+    const created = await insertStep(tx, projectId, { ...input, slug: undefined }, [], undefined, userId, source)
     await tx.update(project).set({ activeStepId: created.id, updatedAt: new Date() }).where(eq(project.id, projectId))
     return created
   })
