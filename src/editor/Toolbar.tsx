@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import type { ProjectDto } from '../core/api.ts'
-import { IconDownload, IconHistory, IconHull, IconLayout, IconPlay, IconSearch, IconUpload } from '../components/icons.tsx'
+import { IconActivity, IconHull, IconLayout, IconPlay, IconSearch } from '../components/icons.tsx'
 import { canvasActions } from './canvas/actions.ts'
-import { ExportMenu } from './ExportMenu.tsx'
-import { ImportDialog } from './ImportDialog.tsx'
 import { useEditorStore, type FocusMode } from './store.ts'
 
 const MODES: { id: FocusMode; label: string; title: string }[] = [
@@ -43,7 +41,6 @@ export function Toolbar({ project }: { project: ProjectDto }) {
   const setSearchOpen = useEditorStore((s) => s.setSearchOpen)
   const [organizing, setOrganizing] = useState(false)
   const [groupByStep, setGroupByStep] = useState(true)
-  const [importing, setImporting] = useState(false)
 
   async function organize() {
     setOrganizing(true)
@@ -116,14 +113,8 @@ export function Toolbar({ project }: { project: ProjectDto }) {
         <IconHull />
       </IconButton>
       <IconButton label="Actividad" active={activityOpen} onClick={toggleActivity}>
-        <IconHistory />
+        <IconActivity />
       </IconButton>
-      <button className="btn shrink-0" onClick={() => setImporting(true)} title="Importar DBML o DDL de SQL Server" aria-label="Importar">
-        <IconUpload />
-        <span className={LABEL}>Importar</span>
-      </button>
-      <ExportMenu project={project} labelClassName={LABEL} icon={<IconDownload />} />
-      {importing && <ImportDialog project={project} onClose={() => setImporting(false)} />}
     </div>
   )
 }

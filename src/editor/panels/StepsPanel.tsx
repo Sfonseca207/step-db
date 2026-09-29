@@ -4,7 +4,7 @@ import type { ProjectDto, StepDto } from '../../core/api.ts'
 import { contrastText, nextStepColor } from '../../core/palette.ts'
 import { foreignColumnsOfStep } from '../../core/model.ts'
 import { stepNumber } from '../../core/slug.ts'
-import { IconPlus } from '../../components/icons.tsx'
+import { IconCheck, IconInProgress, IconPlus } from '../../components/icons.tsx'
 import { api, ApiError } from '../../lib/api.ts'
 import { projectQueryKey } from '../hooks.ts'
 import { useEditorStore } from '../store.ts'
@@ -26,6 +26,7 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
   const selectedStepId = useEditorStore((s) => s.selectedStepId)
   const selectStep = useEditorStore((s) => s.selectStep)
   const requestCenter = useEditorStore((s) => s.requestCenter)
+  const setSideTab = useEditorStore((s) => s.setSideTab)
   const [dialog, setDialog] = useState<{ mode: 'create' } | { mode: 'edit'; step: StepDto } | null>(null)
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
@@ -112,7 +113,7 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-slate-50/60">
-      <div className="flex shrink-0 items-center justify-between px-4 pt-3 pb-2">
+      <div className="flex h-11 shrink-0 items-center justify-between px-4">
         <h2 className="text-xs font-semibold tracking-wider text-slate-500 uppercase">Steps · {project.steps.length}</h2>
         <button
           className={`text-[11px] font-medium ${selectedStepId ? 'text-slate-500 hover:text-slate-900' : 'invisible'}`}
@@ -121,8 +122,7 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
           Quitar selección
         </button>
       </div>
-      <ol className="relative min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        <span className="absolute top-2 bottom-2 left-[26px] w-px bg-slate-200" aria-hidden />
+      <ol className="relative flex min-h-0 flex-1 flex-col overflow-y-auto px-3 pb-3">
         {project.steps.map((s, index) => {
           const st = stats.get(s.id)
           const active = project.activeStepId === s.id
@@ -130,7 +130,7 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
           return (
             <li
               key={s.id}
-              className={`sdb-rise relative pl-8 pb-2 ${overId === s.id ? 'sdb-drop-target' : ''}`}
+              className={`sdb-rise relative shrink-0 pl-8 pb-2 ${overId === s.id ? 'sdb-drop-target' : ''}`}
               style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
               draggable
               onDragStart={(e) => {
@@ -148,8 +148,10 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                 setOverId(null)
               }}
             >
+              {/* Tramo de la línea de tiempo, centrado con el punto (x = 16,5 px). */}
+              <span className={`absolute bottom-0 left-4 w-px bg-slate-200 ${index === 0 ? 'top-2' : 'top-0'}`} aria-hidden />
               <span
-                className={`absolute top-4 left-[9px] h-3.5 w-3.5 rounded-full border-2 border-white transition-colors duration-300 ${active ? 'sdb-pulse' : ''}`}
+                className={`absolute top-4 left-[9px] h-[15px] w-[15px] rounded-full border-2 border-white transition-colors duration-300 ${active ? 'sdb-pulse' : ''}`}
                 style={{ background: s.color, '--pulse': s.color } as React.CSSProperties}
                 title={active ? 'Step activo' : undefined}
               />
@@ -186,10 +188,10 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                     <span className="mt-0.5 rounded bg-slate-900 px-1.5 text-[10px] leading-4 font-semibold text-white">activo</span>
                   )}
                   <span
-                    className={`text-xs ${s.status === 'completado' ? 'text-emerald-600' : 'text-sky-600'}`}
+                    className={`mt-0.5 shrink-0 ${s.status === 'completado' ? 'text-emerald-600' : 'text-sky-600'}`}
                     title={s.status === 'completado' ? 'Completado' : 'En curso'}
                   >
-                    {s.status === 'completado' ? '✓' : '◉'}
+                    {s.status === 'completado' ? <IconCheck width={14} height={14} strokeWidth={2.4} /> : <IconInProgress width={14} height={14} />}
                   </span>
                 </span>
                 <span className="mt-1 flex items-center gap-2 text-[11px] whitespace-nowrap text-slate-500">
@@ -221,6 +223,16 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                   >
                     Editar
                   </button>
+                  <button
+                    className="rounded transition-colors hover:text-slate-800 focus-visible:text-slate-800 focus-visible:outline-none"
+                    onClick={() => {
+                      if (!selected) selectStep(s.id)
+                      setSideTab('dbml')
+                    }}
+                    title="Abrir el DBML de este step"
+                  >
+                    Código
+                  </button>
                   {!active && (
                     <button
                       className="rounded transition-colors hover:text-slate-800 focus-visible:text-slate-800 focus-visible:outline-none"
@@ -235,6 +247,10 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
             </li>
           )
         })}
+        {/* La línea sigue hasta el final del panel, también con un solo step. */}
+        <li className="relative min-h-0 flex-1" aria-hidden>
+          <span className="absolute inset-y-0 left-4 w-px bg-slate-200" />
+        </li>
       </ol>
       <div className="shrink-0 border-t border-slate-200 p-3">
         <button

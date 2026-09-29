@@ -1,9 +1,30 @@
-import { EdgeLabelRenderer, getBezierPath, Position, type EdgeProps } from '@xyflow/react'
+import { EdgeLabelRenderer, useStore, type EdgeProps, type Node } from '@xyflow/react'
 import { memo } from 'react'
 import { useEditorStore } from '../store.ts'
 import type { RelationEdge as RelationEdgeType } from './graph.ts'
+import { routeRelation, type Obstacle, type Route } from './route.ts'
 
 type EndKind = 'one' | 'zero-one' | 'many'
+
+// Las tablas como obstáculos del trazado: se calculan una vez por cada cambio de nodos, no por arista.
+let obstacleNodes: readonly Node[] | null = null
+let obstacles: Obstacle[] = []
+function obstaclesOf(nodes: readonly Node[]): Obstacle[] {
+  if (nodes !== obstacleNodes) {
+    obstacleNodes = nodes
+    // Las tablas ocultas del replay también cuentan: así el trazo ya tiene su forma final.
+    obstacles = nodes.map((n) => ({
+      id: n.id,
+      x: n.position.x,
+      y: n.position.y,
+      width: n.measured?.width ?? n.initialWidth ?? 0,
+      height: n.measured?.height ?? n.initialHeight ?? 0,
+    }))
+  }
+  return obstacles
+}
+
+const sameRoute = (a: Route, b: Route) => a.path === b.path
 
 /** Marcador crow's foot dibujado en el extremo (x, y); `dir` = hacia dónde sale la línea. */
 function markerPath(x: number, y: number, dir: 1 | -1, kind: EndKind): string {
@@ -19,30 +40,35 @@ function markerPath(x: number, y: number, dir: 1 | -1, kind: EndKind): string {
 }
 
 function RelationEdgeComponent(props: EdgeProps<RelationEdgeType>) {
-  const { id, sourceX, sourceY, targetX, targetY, data } = props
+  const { id, source, target, sourceX, sourceY, targetX, targetY, data } = props
   const hovered = useEditorStore((s) => s.hoveredEdge === id)
   const newToken = useEditorStore((s) => s.highlights.newRelations[id])
   const selectedTable = useEditorStore((s) => s.selectedTable)
   const dimmedByFocus = useEditorStore((s) => s.focusRelations !== null && !s.focusRelations.has(id))
+  // Aleja los extremos para dejar sitio a los marcadores.
+  const sourceDir = data?.sourceDir ?? 1
+  const targetDir = data?.targetDir ?? -1
+  const sx = sourceX + sourceDir * 2
+  const tx = targetX + targetDir * 2
+  // Trazo ortogonal con codos redondeados, al estilo dbdiagram, que esquiva las demás tablas.
+  const { path, labelX, labelY } = useStore(
+    (s) =>
+      routeRelation({
+        source: { x: sx, y: sourceY },
+        target: { x: tx, y: targetY },
+        sourceDir,
+        targetDir,
+        obstacles: obstaclesOf(s.nodes),
+        ignore: [source, target],
+      }),
+    sameRoute,
+  )
   if (!data) return null
-  const { relation, fromColor, toColor, optionalOne, sourceDir, targetDir, removing } = data
+  const { relation, fromColor, toColor, optionalOne, removing } = data
   const logical = relation.kind === 'logical'
   const involved = selectedTable !== null && (relation.from.table === selectedTable || relation.to.table === selectedTable)
   // La selección de una tabla manda sobre el enfoque por step.
   const dimmed = selectedTable !== null ? !involved : dimmedByFocus
-
-  // Aleja los extremos para dejar sitio a los marcadores.
-  const sx = sourceX + sourceDir * 2
-  const tx = targetX + targetDir * 2
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX: sx,
-    sourceY,
-    targetX: tx,
-    targetY,
-    sourcePosition: sourceDir === 1 ? Position.Right : Position.Left,
-    targetPosition: targetDir === 1 ? Position.Right : Position.Left,
-    curvature: 0.35,
-  })
 
   const sameColor = fromColor.toLowerCase() === toColor.toLowerCase()
   const gradientId = `sdb-grad-${id.replace(/[^a-zA-Z0-9_-]/g, '_')}`

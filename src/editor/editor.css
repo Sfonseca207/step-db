@@ -1,4 +1,8 @@
 /* Canvas: fondo blanco con cuadrícula de puntos sutil (SPEC §10.2) */
+/* El deslizamiento horizontal con dos dedos desplaza el canvas: no debe navegar atrás en el historial. */
+.sdb-canvas {
+  overscroll-behavior: none;
+}
 .sdb-canvas .react-flow__pane {
   cursor: default;
 }
@@ -70,6 +74,9 @@
   transition: color 400ms ease, background-color 400ms ease;
 }
 .sdb-warn-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
   margin-left: auto;
   flex-shrink: 0;
   border-radius: 999px;

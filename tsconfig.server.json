@@ -21,5 +21,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["server", "src/core", "src/editor/canvas/pack.ts", "src/editor/canvas/pack.test.ts", "src/editor/focus.ts", "src/editor/focus.test.ts", "drizzle.config.ts", "vitest.config.ts"]
+  "include": ["server", "src/core", "src/editor/canvas/pack.ts", "src/editor/canvas/pack.test.ts", "src/editor/focus.ts", "src/editor/focus.test.ts", "src/editor/panels/dbml-complete.ts", "src/editor/panels/dbml-complete.test.ts", "drizzle.config.ts", "vitest.config.ts"]
 }

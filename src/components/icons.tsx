@@ -80,15 +80,56 @@ export const IconPanelLeft = (p: SVGProps<SVGSVGElement>) => (
     <path d="M9 4v16" />
   </svg>
 )
-export const IconPanelRight = (p: SVGProps<SVGSVGElement>) => (
-  <svg {...base(p)}>
-    <rect x="3" y="4" width="18" height="16" rx="2" />
-    <path d="M15 4v16" />
-  </svg>
-)
 export const IconHistory = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
     <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
     <path d="M3 3v5h5M12 7v5l3 2" />
+  </svg>
+)
+export const IconSteps = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="6" cy="5" r="2" />
+    <circle cx="6" cy="12" r="2" />
+    <circle cx="6" cy="19" r="2" />
+    <path d="M6 7v3M6 14v3M12 5h8M12 12h8M12 19h5" />
+  </svg>
+)
+export const IconCode = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="m8 7-5 5 5 5M16 7l5 5-5 5M13.5 5l-3 14" />
+  </svg>
+)
+export const IconWarning = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12 4 2.8 19.5h18.4L12 4Z" />
+    <path d="M12 10v4.5M12 17.2v.1" />
+  </svg>
+)
+export const IconActivity = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M3 12h4l3-8 4 16 3-8h4" />
+  </svg>
+)
+export const IconCheck = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="m5 12.5 4.5 4.5L19 7.5" />
+  </svg>
+)
+/** Estado «en curso»: un punto dentro de un círculo. */
+export const IconInProgress = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="8.5" />
+    <circle cx="12" cy="12" r="3" fill="currentColor" stroke="none" />
+  </svg>
+)
+export const IconArrowLeft = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M19 12H5M11 6l-6 6 6 6" />
+  </svg>
+)
+export const IconSparkles = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M10 3.5 11.8 9l5.2 2-5.2 2L10 18.5 8.2 13 3 11l5.2-2L10 3.5Z" />
+    <path d="M18.5 3v4M16.5 5h4M18.5 16.5v4M16.5 18.5h4" />
   </svg>
 )

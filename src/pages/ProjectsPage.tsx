@@ -1,11 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import type { ProjectDto, ProjectSummaryDto } from '../core/api.ts'
 import { STEP_PALETTE } from '../core/palette.ts'
 import { AppShell } from '../components/AppShell.tsx'
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx'
-import { api } from '../lib/api.ts'
+import { IconClose, IconPlus, IconSparkles } from '../components/icons.tsx'
+import { NewProjectDialog, type NewProjectValues } from '../components/NewProjectDialog.tsx'
+import { api, ApiError } from '../lib/api.ts'
+
+/** Mensaje para mostrar cuando falla una petición: el del servidor o uno genérico si no hubo respuesta. */
+function errorText(e: unknown, fallback: string): string {
+  return e instanceof ApiError ? e.message : `${fallback}. Revisa tu conexión e inténtalo de nuevo.`
+}
 
 function relativeDate(iso: string): string {
   return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -15,14 +22,15 @@ export default function ProjectsPage() {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const projects = useQuery({ queryKey: ['projects'], queryFn: () => api<ProjectSummaryDto[]>('GET', '/api/projects') })
-  const [name, setName] = useState('')
+  const [creating, setCreating] = useState(false)
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState<ProjectSummaryDto | null>(null)
   const location = useLocation()
   const [notice, setNotice] = useState<string | null>((location.state as { notice?: string } | null)?.notice ?? null)
 
   const create = useMutation({
-    mutationFn: (n: string) => api<ProjectDto>('POST', '/api/projects', { name: n }),
+    mutationFn: (v: NewProjectValues) =>
+      api<ProjectDto>('POST', '/api/projects', { name: v.name, description: v.description || null }),
     onSuccess: (p) => {
       qc.invalidateQueries({ queryKey: ['projects'] })
       navigate(`/p/${p.id}`)
@@ -50,11 +58,6 @@ export default function ProjectsPage() {
     },
   })
 
-  function onCreate(e: FormEvent) {
-    e.preventDefault()
-    if (name.trim()) create.mutate(name.trim())
-  }
-
   const list = projects.data ?? []
 
   return (
@@ -66,20 +69,17 @@ export default function ProjectsPage() {
             <p className="mt-1 text-sm text-slate-500">Cada proyecto es un modelo de datos construido por steps.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <form onSubmit={onCreate} className="flex gap-2">
-              <input
-                className="input w-56"
-                placeholder="Nombre del proyecto"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                aria-label="Nombre del proyecto"
-              />
-              <button className="btn btn-primary" disabled={!name.trim() || create.isPending}>
-                Crear proyecto
-              </button>
-            </form>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                create.reset()
+                setCreating(true)
+              }}
+            >
+              <IconPlus /> Nuevo proyecto
+            </button>
             <button className="btn" onClick={() => example.mutate()} disabled={example.isPending}>
-              <span aria-hidden>✨</span>
+              <IconSparkles />
               {example.isPending ? 'Creando…' : 'Crear proyecto de ejemplo'}
             </button>
           </div>
@@ -92,6 +92,11 @@ export default function ProjectsPage() {
               Entendido
             </button>
           </div>
+        )}
+        {example.isError && (
+          <p className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700" role="alert">
+            {errorText(example.error, 'No se pudo crear el proyecto de ejemplo')}
+          </p>
         )}
         {projects.isLoading && <p className="text-sm text-slate-400">Cargando…</p>}
         {projects.isError && <p className="text-sm text-red-600">No se pudieron cargar los proyectos.</p>}
@@ -136,7 +141,7 @@ export default function ProjectsPage() {
                     />
                     <button className="btn btn-primary relative z-10">OK</button>
                     <button type="button" className="btn relative z-10" onClick={() => setRenaming(null)} aria-label="Cancelar">
-                      ✕
+                      <IconClose />
                     </button>
                   </form>
                 ) : (
@@ -167,6 +172,14 @@ export default function ProjectsPage() {
           ))}
         </ul>
       </div>
+      {creating && (
+        <NewProjectDialog
+          busy={create.isPending}
+          error={create.isError ? errorText(create.error, 'No se pudo crear el proyecto') : null}
+          onClose={() => setCreating(false)}
+          onSubmit={(v) => create.mutate(v)}
+        />
+      )}
       {deleting && (
         <ConfirmDialog
           title="Borrar proyecto"

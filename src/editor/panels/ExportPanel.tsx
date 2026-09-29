@@ -1,16 +1,21 @@
 import { useMemo, useState } from 'react'
 import type { ProjectDto } from '../../core/api.ts'
-import { EXPORT_EXTENSIONS, exportInputFrom, runExport } from '../../core/export/index.ts'
+import { EXPORT_EXTENSIONS, exportInputFrom, runExport, type ExportTarget } from '../../core/export/index.ts'
 import { IconCopy, IconDownload } from '../../components/icons.tsx'
 import { copyText, downloadText, safeFileName } from '../../lib/download.ts'
 import { useEditorStore } from '../store.ts'
 import { CodeEditor } from './CodeEditor.tsx'
 
+const LANGUAGE: Record<ExportTarget, 'sql' | 'javascript' | 'dbml'> = { mssql: 'sql', mongo: 'javascript', dbml: 'dbml' }
+
 /** Vista de solo lectura de lo exportado (RF-30, RF-51, RF-52, RF-60). */
-export function ExportPanel({ project, target }: { project: ProjectDto; target: 'mssql' | 'mongo' }) {
+export function ExportPanel({ project, target }: { project: ProjectDto; target: ExportTarget }) {
   const model = useEditorStore((s) => s.model)
   const hasErrors = useEditorStore((s) => s.errors.length > 0)
-  const [stepId, setStepId] = useState('')
+  const [chosenStepId, setStepId] = useState('')
+  // El DBML combinado siempre es del proyecto completo.
+  const scoped = target !== 'dbml'
+  const stepId = scoped ? chosenStepId : ''
   const [idempotent, setIdempotent] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -28,19 +33,23 @@ export function ExportPanel({ project, target }: { project: ProjectDto; target: 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-2">
-        <select
-          className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
-          value={stepId}
-          onChange={(e) => setStepId(e.target.value)}
-          aria-label="Alcance de la exportación"
-        >
-          <option value="">Modelo completo</option>
-          {project.steps.map((s) => (
-            <option key={s.id} value={s.id}>
-              Solo {s.slug}
-            </option>
-          ))}
-        </select>
+        {scoped ? (
+          <select
+            className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs"
+            value={stepId}
+            onChange={(e) => setStepId(e.target.value)}
+            aria-label="Alcance de la exportación"
+          >
+            <option value="">Modelo completo</option>
+            {project.steps.map((s) => (
+              <option key={s.id} value={s.id}>
+                Solo {s.slug}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span className="text-xs text-slate-500">Modelo completo para dbdiagram.io, con grupos por step</span>
+        )}
         {target === 'mssql' && (
           <label className="flex items-center gap-1 text-xs text-slate-600" title="Envuelve cada objeto en IF OBJECT_ID(...) IS NULL">
             <input type="checkbox" checked={idempotent} onChange={(e) => setIdempotent(e.target.checked)} />
@@ -73,7 +82,7 @@ export function ExportPanel({ project, target }: { project: ProjectDto; target: 
         <CodeEditor
           path={`file:///export/${target}.${EXPORT_EXTENSIONS[target]}`}
           value={text}
-          language={target === 'mssql' ? 'sql' : 'javascript'}
+          language={LANGUAGE[target]}
           readOnly
         />
       </div>

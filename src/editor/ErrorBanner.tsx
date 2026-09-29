@@ -1,3 +1,4 @@
+import { IconWarning } from '../components/icons.tsx'
 import { formatDiagnostic } from '../core/model.ts'
 import { useEditorStore } from './store.ts'
 
@@ -19,7 +20,7 @@ export function ErrorBanner() {
           }
         }}
       >
-        <span className="mt-0.5 text-amber-600">⚠</span>
+        <IconWarning className="mt-0.5 shrink-0 text-amber-600" />
         <span className="min-w-0 flex-1">
           <span className="block font-mono text-xs font-semibold text-amber-900">{formatDiagnostic(first)}</span>
           <span className="block text-xs text-amber-800">

@@ -1,6 +1,7 @@
 import type { Edge, Node } from '@xyflow/react'
 import type { ColumnModel, Diagnostic, ProjectModel, RelationModel, TableModel } from '../../core/types.ts'
 import type { GhostColumn, StepMeta } from '../store.ts'
+import { FACING_GAP } from './route.ts'
 
 export interface Point {
   x: number
@@ -184,6 +185,9 @@ export function buildNodes(
   })
 }
 
+/** Holgura sobre `FACING_GAP`: los lados se recalculan por tramos de 20 px, no en cada movimiento. */
+const SIDE_SLACK = 20
+
 /** Aristas columna a columna; cada extremo usa el lado más cercano de su nodo. */
 export function buildEdges(
   relations: readonly RelationModel[],
@@ -205,8 +209,10 @@ export function buildEdges(
       sourceSide = 'R'
       targetSide = 'R'
     } else if (a && b) {
-      if (b.left > a.right) [sourceSide, targetSide] = ['R', 'L']
-      else if (a.left > b.right) [sourceSide, targetSide] = ['L', 'R']
+      // Enfrentadas solo si el hueco entre las dos deja sitio al canal y a los marcadores.
+      const gap = FACING_GAP + SIDE_SLACK
+      if (b.left - a.right >= gap) [sourceSide, targetSide] = ['R', 'L']
+      else if (a.left - b.right >= gap) [sourceSide, targetSide] = ['L', 'R']
       else [sourceSide, targetSide] = a.cx <= b.cx ? ['R', 'R'] : ['L', 'L']
     }
     const fromCol = r.from.columns[0]

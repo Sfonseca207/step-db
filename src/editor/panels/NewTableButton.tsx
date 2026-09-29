@@ -22,7 +22,7 @@ export function NewTableButton({ project, step, kind }: { project: ProjectDto; s
     }, 450)
   }
   return (
-    <button className="btn px-2 py-0.5 text-xs" onClick={insert} title="Insertar una tabla que respeta las convenciones">
+    <button className="btn px-2 py-0.5 text-xs whitespace-nowrap" onClick={insert} title="Insertar una tabla que respeta las convenciones">
       <IconPlus width={12} height={12} />
       {kind === 'mongo' ? 'Nueva colección' : 'Nueva tabla'}
     </button>

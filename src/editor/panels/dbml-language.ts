@@ -1,4 +1,6 @@
 import type * as Monaco from 'monaco-editor/editor/editor.api'
+import { currentCatalog, kindOfPath } from './dbml-catalog.ts'
+import { completeDbml, type ItemKind } from './dbml-complete.ts'
 
 /** Gramática Monarch de DBML + extensiones de StepDB (`[step: "…"]`). */
 export function registerDbml(monaco: typeof Monaco) {
@@ -109,37 +111,44 @@ export function registerDbml(monaco: typeof Monaco) {
     indentationRules: { increaseIndentPattern: /\{\s*$/, decreaseIndentPattern: /^\s*\}/ },
   })
 
-  const snippet = monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+  const K = monaco.languages.CompletionItemKind
+  const kinds: Record<ItemKind, Monaco.languages.CompletionItemKind> = {
+    keyword: K.Keyword,
+    snippet: K.Snippet,
+    type: K.TypeParameter,
+    enum: K.Enum,
+    table: K.Struct,
+    column: K.Field,
+    schema: K.Module,
+    step: K.Event,
+    setting: K.Property,
+    value: K.Value,
+    operator: K.Operator,
+  }
   monaco.languages.registerCompletionItemProvider('dbml', {
+    // Además de las letras, abren la lista los caracteres tras los que cambia lo que se puede escribir.
+    triggerCharacters: [' ', '.', '[', ',', ':', '"', '>', '<', '-', '~', '('],
     provideCompletionItems(model, position) {
-      const word = model.getWordUntilPosition(position)
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: word.startColumn,
-        endColumn: word.endColumn,
-      }
-      const K = monaco.languages.CompletionItemKind
+      const found = completeDbml({
+        text: model.getValue(),
+        offset: model.getOffsetAt(position),
+        kind: kindOfPath(model.uri.path),
+        catalog: currentCatalog(),
+      })
+      if (!found) return { suggestions: [] }
+      const range = monaco.Range.fromPositions(model.getPositionAt(found.from), model.getPositionAt(found.to))
       return {
-        suggestions: [
-          {
-            label: 'Table',
-            kind: K.Snippet,
-            insertText: 'Table ${1:schema}.${2:tabla} {\n\tid bigint [pk, increment]\n\t$0\n}',
-            insertTextRules: snippet,
-            range,
-          },
-          { label: 'Ref', kind: K.Snippet, insertText: 'Ref: ${1:a.b.c} > ${2:x.y.id}', insertTextRules: snippet, range },
-          { label: 'Enum', kind: K.Snippet, insertText: 'Enum ${1:schema}.${2:nombre} {\n\t$0\n}', insertTextRules: snippet, range },
-          { label: 'indexes', kind: K.Snippet, insertText: 'indexes {\n\t${1:columna} [name: \'${2:ix}\']\n}', insertTextRules: snippet, range },
-          { label: 'step', kind: K.Property, insertText: 'step: "${1:NN-slug}"', insertTextRules: snippet, range },
-          ...['pk', 'increment', 'not null', 'unique', 'default: ', 'note: ', 'ref: > '].map((s) => ({
-            label: s.trim(),
-            kind: K.Keyword,
-            insertText: s,
-            range,
-          })),
-        ],
+        suggestions: found.items.map((item, index) => ({
+          label: item.label,
+          kind: kinds[item.kind],
+          detail: item.detail,
+          insertText: item.insert,
+          insertTextRules: item.snippet ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
+          // El orden lo decide el contexto (lo más probable arriba), no el alfabeto.
+          sortText: String(index).padStart(4, '0'),
+          command: item.retrigger ? { id: 'editor.action.triggerSuggest', title: 'Sugerir' } : undefined,
+          range,
+        })),
       }
     },
   })
@@ -165,6 +174,14 @@ export function registerDbml(monaco: typeof Monaco) {
       'editorLineNumber.activeForeground': '#64748B',
       'editor.lineHighlightBackground': '#F8FAFC',
       'editorIndentGuide.background1': '#F1F5F9',
+      'editorSuggestWidget.background': '#FFFFFF',
+      'editorSuggestWidget.border': '#E2E8F0',
+      'editorSuggestWidget.foreground': '#334155',
+      'editorSuggestWidget.selectedBackground': '#E2E8F0',
+      'editorSuggestWidget.selectedForeground': '#0F172A',
+      'editorSuggestWidget.selectedIconForeground': '#0F172A',
+      'editorSuggestWidget.highlightForeground': '#0090FF',
+      'editorSuggestWidget.focusHighlightForeground': '#0090FF',
     },
   })
 }

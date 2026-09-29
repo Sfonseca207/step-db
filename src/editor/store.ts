@@ -24,7 +24,23 @@ export interface Toast {
   tone?: 'info' | 'error' | 'success'
 }
 
-export type SidePanelTab = 'dbml' | 'views' | 'notes' | 'mssql' | 'mongo' | 'warnings' | 'history'
+/** Contenido del panel lateral: la línea de tiempo de steps o una de las vistas del editor. */
+export type SidePanelTab = 'steps' | 'dbml' | 'views' | 'notes' | 'import' | 'mssql' | 'mongo' | 'combined' | 'warnings' | 'history'
+export type CodeTab = 'dbml' | 'views' | 'notes'
+/** `combined` es el DBML de todo el proyecto (el destino `dbml` de los exportadores). */
+export type ExportTab = 'mssql' | 'mongo' | 'combined'
+
+/** Qué muestra la sección de código: los archivos del step elegido o los de todos los steps. */
+export type CodeScope = 'step' | 'all'
+
+const CODE_SCOPE_KEY = 'stepdb:code-scope'
+function storedCodeScope(): CodeScope {
+  try {
+    return localStorage.getItem(CODE_SCOPE_KEY) === 'all' ? 'all' : 'step'
+  } catch {
+    return 'step'
+  }
+}
 
 export const fileKey = (stepId: string, kind: FileKind) => `${stepId}:${kind}`
 
@@ -93,6 +109,11 @@ interface EditorState {
   hoverColumns: Record<string, string[]>
   searchOpen: boolean
   sideTab: SidePanelTab
+  /** Última pestaña visitada de cada sección con subpestañas: a ella vuelve la barra lateral. */
+  lastCodeTab: CodeTab
+  lastExportTab: ExportTab
+  codeScope: CodeScope
+  sidebarOpen: boolean
   showHulls: boolean
   replay: { active: boolean; stepIndex: number; playing: boolean; speed: number } | null
   /** Tablas visibles durante el replay (null = todas). */
@@ -124,7 +145,10 @@ interface EditorState {
   selectTable(key: string | null): void
   hoverEdge(edgeId: string | null, columns?: Record<string, string[]>): void
   setSearchOpen(open: boolean): void
+  /** Cambia el contenido del panel lateral y lo abre si estaba cerrado. */
   setSideTab(tab: SidePanelTab): void
+  setCodeScope(scope: CodeScope): void
+  setSidebarOpen(open: boolean): void
   toggleHulls(): void
   setReplay(
     replay: EditorState['replay'],
@@ -183,7 +207,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   hoveredEdge: null,
   hoverColumns: {},
   searchOpen: false,
-  sideTab: 'dbml',
+  sideTab: 'steps',
+  lastCodeTab: 'dbml',
+  lastExportTab: 'mssql',
+  codeScope: storedCodeScope(),
+  // En pantallas angostas el panel flota sobre el canvas: arranca cerrado.
+  sidebarOpen: typeof window === 'undefined' || window.innerWidth >= 1024,
   showHulls: false,
   replay: null,
   replayVisible: null,
@@ -294,7 +323,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ searchOpen: open })
   },
   setSideTab(tab) {
-    set({ sideTab: tab })
+    set({
+      sideTab: tab,
+      sidebarOpen: true,
+      ...(tab === 'dbml' || tab === 'views' || tab === 'notes' ? { lastCodeTab: tab } : {}),
+      ...(tab === 'mssql' || tab === 'mongo' || tab === 'combined' ? { lastExportTab: tab } : {}),
+    })
+  },
+  setCodeScope(scope) {
+    set({ codeScope: scope })
+    try {
+      localStorage.setItem(CODE_SCOPE_KEY, scope)
+    } catch {
+      // sin almacenamiento: la preferencia dura lo que dure la sesión
+    }
+  },
+  setSidebarOpen(open) {
+    set({ sidebarOpen: open })
   },
   toggleHulls() {
     set({ showHulls: !get().showHulls })

@@ -337,6 +337,11 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
         defaultViewport={layout.viewport ?? { x: 40, y: 40, zoom: 0.85 }}
         minZoom={0.1}
         maxZoom={2}
+        // Gestos de trackpad: dos dedos desplazan, pellizcar (o Cmd/Ctrl + scroll) hace zoom.
+        panOnScroll
+        panOnScrollSpeed={1}
+        zoomOnScroll={false}
+        zoomOnPinch
         nodesConnectable={false}
         // El modelo es code-first: las tablas no se borran desde el canvas.
         deleteKeyCode={null}

@@ -1,6 +1,7 @@
 import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
 import { motion, useReducedMotion } from 'motion/react'
-import { memo, useEffect } from 'react'
+import { memo, useEffect, useState } from 'react'
+import { IconWarning } from '../../components/icons.tsx'
 import { contrastText, tint } from '../../core/palette.ts'
 import { useEditorStore } from '../store.ts'
 import type { TableNode as TableNodeType } from './graph.ts'
@@ -63,6 +64,23 @@ function TableNodeComponent({ id, data }: NodeProps<TableNodeType>) {
     // `replayMaxPos` cambia las filas visibles (y sus handles) durante el replay.
   }, [id, handlesKey, rows.length, replayMaxPos, updateNodeInternals])
 
+  // React Flow mide los handles con `getBoundingClientRect`: una tabla nueva entra a escala real
+  // (invisible) y la animación de aparición arranca cuando ya se midieron. Si no, las relaciones
+  // terminan dentro de la tabla hasta la siguiente medición.
+  const [appears] = useState(() => newToken !== undefined && !reduced)
+  const [measuring, setMeasuring] = useState(appears)
+  useEffect(() => {
+    if (!measuring) return
+    let second = 0
+    const first = requestAnimationFrame(() => {
+      second = requestAnimationFrame(() => setMeasuring(false))
+    })
+    return () => {
+      cancelAnimationFrame(first)
+      cancelAnimationFrame(second)
+    }
+  }, [measuring])
+
   const isMongo = table.store === 'mongo'
   const headerText = contrastText(color)
   const handles = new Set(handleColumns)
@@ -73,10 +91,18 @@ function TableNodeComponent({ id, data }: NodeProps<TableNodeType>) {
     // El atenuado va en un contenedor propio: Motion controla la opacidad del nodo al aparecer o desaparecer.
     <div className={`sdb-node ${dimmed ? 'sdb-dimmed' : ''}`}>
       <motion.div
-        initial={isNew && !reduced ? { scale: 0.55, opacity: 0 } : false}
-        animate={{ scale: removing ? 0.92 : 1, opacity: removing ? 0 : 1 }}
+        initial={false}
+        animate={
+          measuring
+            ? { scale: 1, opacity: 0 }
+            : removing
+              ? { scale: 0.92, opacity: 0 }
+              : appears
+                ? { scale: [0.55, 1], opacity: [0, 1] }
+                : { scale: 1, opacity: 1 }
+        }
         transition={
-          reduced
+          reduced || measuring
             ? { duration: 0 }
             : removing
               ? { duration: 0.32, ease: [0.4, 0, 1, 1] }
@@ -104,10 +130,11 @@ function TableNodeComponent({ id, data }: NodeProps<TableNodeType>) {
           {warnings.length > 0 && (
             <span
               className="sdb-warn-badge"
-              title={warnings.map((w) => `⚠ ${w.message}`).join('\n')}
+              title={warnings.map((w) => w.message).join('\n')}
               aria-label={`${warnings.length} advertencias`}
             >
-              ⚠ {warnings.length}
+              <IconWarning width={10} height={10} strokeWidth={2.6} />
+              {warnings.length}
             </span>
           )}
           <span className="sdb-step-badge" style={{ color, background: headerText }}>

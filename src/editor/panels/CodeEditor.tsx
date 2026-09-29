@@ -12,19 +12,30 @@ interface Props {
   readOnly?: boolean
   diagnostics?: Diagnostic[]
   reveal?: { line: number; token: number } | null
+  /**
+   * El editor crece con su contenido y el scroll lo lleva el contenedor `[data-code-scroll]`
+   * (vista de todos los steps). El valor es el alto estimado hasta que Monaco mide el suyo.
+   */
+  autoHeight?: number
   onChange?: (value: string) => void
 }
 
 /** Último "ir a la línea" atendido: al volver a abrir una pestaña no se repite uno viejo. */
 let handledRevealToken = 0
 
-export function CodeEditor({ path, value, language, readOnly, diagnostics, reveal, onChange }: Props) {
+export function CodeEditor({ path, value, language, readOnly, diagnostics, reveal, autoHeight, onChange }: Props) {
   const editorRef = useRef<Parameters<OnMount>[0] | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [contentHeight, setContentHeight] = useState<number | null>(null)
+  const grows = autoHeight !== undefined
 
   const onMount: OnMount = (editor) => {
     editorRef.current = editor
     setMounted(true)
+    if (grows) {
+      setContentHeight(editor.getContentHeight())
+      editor.onDidContentSizeChange((e) => setContentHeight(e.contentHeight))
+    }
     // Cmd/Ctrl+K abre la búsqueda de StepDB también con el foco en el editor.
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => useEditorStore.getState().setSearchOpen(true))
   }
@@ -47,7 +58,7 @@ export function CodeEditor({ path, value, language, readOnly, diagnostics, revea
         }
       })
     monaco.editor.setModelMarkers(model, 'stepdb', markers)
-  }, [diagnostics, path, value])
+  }, [diagnostics, path, value, mounted])
 
   // Ir a una línea: espera a que el editor esté montado y muestre el archivo pedido
   // (la petición puede llegar antes, p. ej. al cambiar de pestaña o de step).
@@ -66,6 +77,13 @@ export function CodeEditor({ path, value, language, readOnly, diagnostics, revea
       editor.revealLineInCenter(reveal.line)
       editor.setPosition({ lineNumber: reveal.line, column: model.getLineFirstNonWhitespaceColumn(reveal.line) || 1 })
       editor.focus()
+      // Con alto automático el editor no tiene scroll propio: se desplaza el contenedor.
+      const node = editor.getDomNode()
+      const scroller = grows ? node?.closest('[data-code-scroll]') : null
+      if (node && scroller) {
+        const top = node.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
+        scroller.scrollTo({ top: top + editor.getTopForLineNumber(reveal.line) - scroller.clientHeight / 2 })
+      }
       const deco = editor.createDecorationsCollection([
         { range: new monaco.Range(reveal.line, 1, reveal.line, 1), options: { isWholeLine: true, className: 'sdb-reveal-line' } },
       ])
@@ -76,12 +94,12 @@ export function CodeEditor({ path, value, language, readOnly, diagnostics, revea
       clearTimeout(timer)
       if (clear) clearTimeout(clear)
     }
-  }, [reveal, path, mounted])
+  }, [reveal, path, mounted, grows])
 
   return (
     // `nokey`: React Flow ignora el teclado que viene de aquí. Monaco usa EditContext (un <div>), que
     // React Flow no reconoce como campo de texto y le capturaba Espacio (pan) y Backspace (borrar nodo).
-    <div className="nokey h-full w-full">
+    <div className={`nokey w-full ${grows ? '' : 'h-full'}`} style={grows ? { height: contentHeight ?? autoHeight } : undefined}>
       <Editor
         path={path}
         value={value}
@@ -104,9 +122,16 @@ export function CodeEditor({ path, value, language, readOnly, diagnostics, revea
           wordWrap: readOnly ? 'off' : 'on',
           wrappingIndent: 'deepIndent',
           automaticLayout: true,
-          padding: { top: 10, bottom: 10 },
+          padding: grows ? { top: 6, bottom: 6 } : { top: 10, bottom: 10 },
           fixedOverflowWidgets: true,
-          scrollbar: { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+          // Las sugerencias las da el proyecto (dbml-complete.ts), no las palabras sueltas del archivo.
+          wordBasedSuggestions: 'off',
+          quickSuggestions: language === 'dbml',
+          suggest: { showWords: false },
+          scrollbar: grows
+            ? { vertical: 'hidden', horizontalScrollbarSize: 8, alwaysConsumeMouseWheel: false }
+            : { verticalScrollbarSize: 8, horizontalScrollbarSize: 8 },
+          ...(grows ? { overviewRulerLanes: 0, hideCursorInOverviewRuler: true } : {}),
         }}
       />
     </div>

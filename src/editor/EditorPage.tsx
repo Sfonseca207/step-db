@@ -2,7 +2,7 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { UserMenu } from '../components/AppShell.tsx'
-import { IconPanelLeft, IconPanelRight } from '../components/icons.tsx'
+import { IconPanelLeft } from '../components/icons.tsx'
 import { Logo } from '../components/Logo.tsx'
 import { ApiError } from '../lib/api.ts'
 import { useViewportWidth } from '../lib/useViewport.ts'
@@ -11,8 +11,9 @@ import { ConflictDialog } from './ConflictDialog.tsx'
 import { useAutosave } from './drafts.ts'
 import { ErrorBanner } from './ErrorBanner.tsx'
 import { useLayoutPersistence, useModelSync, useProject } from './hooks.ts'
+import { RAIL_WIDTH } from './panels/sections.ts'
+import { SidebarRail } from './panels/SidebarRail.tsx'
 import { SidePanel } from './panels/SidePanel.tsx'
-import { StepsPanel } from './panels/StepsPanel.tsx'
 import { useRealtime } from './realtime.ts'
 import { useEditorStore } from './store.ts'
 import { LiveStatus } from './LiveStatus.tsx'
@@ -32,14 +33,14 @@ function readWidth(key: string, fallback: number): number {
   }
 }
 
-function Resizer({ onDrag, side }: { onDrag: (dx: number) => void; side: 'left' | 'right' }) {
+function Resizer({ onDrag }: { onDrag: (dx: number) => void }) {
   const [active, setActive] = useState(false)
   const last = useRef(0)
   return (
     <div
       role="separator"
       aria-orientation="vertical"
-      aria-label={side === 'left' ? 'Redimensionar panel de steps' : 'Redimensionar panel del editor'}
+      aria-label="Redimensionar el panel lateral"
       className={`sdb-resizer ${active ? 'active' : ''}`}
       onPointerDown={(e) => {
         last.current = e.clientX
@@ -56,7 +57,7 @@ function Resizer({ onDrag, side }: { onDrag: (dx: number) => void; side: 'left' 
   )
 }
 
-/** Debajo de este ancho los paneles se abren sobre el canvas, de a uno. */
+/** Debajo de este ancho el panel se abre sobre el canvas. */
 const COMPACT_WIDTH = 1024
 
 export default function EditorPage() {
@@ -66,10 +67,12 @@ export default function EditorPage() {
   const { persistPositions, persistViewport } = useLayoutPersistence(projectId)
   const viewport = useViewportWidth()
   const compact = viewport < COMPACT_WIDTH
-  const [leftW, setLeftW] = useState(() => readWidth('stepdb:leftW', window.innerWidth < 1440 ? 256 : 280))
-  const [rightW, setRightW] = useState(() => readWidth('stepdb:rightW', Math.round(Math.min(460, Math.max(340, window.innerWidth * 0.31)))))
-  const [leftOpen, setLeftOpen] = useState(() => window.innerWidth >= COMPACT_WIDTH)
-  const [rightOpen, setRightOpen] = useState(() => window.innerWidth >= COMPACT_WIDTH)
+  // El panel recuerda dos anchos: angosto para la línea de tiempo y amplio para el editor.
+  const [stepsW, setStepsW] = useState(() => readWidth('stepdb:leftW', window.innerWidth < 1440 ? 256 : 280))
+  const [editorW, setEditorW] = useState(() => readWidth('stepdb:rightW', Math.round(Math.min(460, Math.max(340, window.innerWidth * 0.31)))))
+  const showsSteps = useEditorStore((s) => s.sideTab === 'steps')
+  const open = useEditorStore((s) => s.sidebarOpen)
+  const setOpen = useEditorStore((s) => s.setSidebarOpen)
 
   useEffect(() => {
     reset(projectId)
@@ -77,12 +80,12 @@ export default function EditorPage() {
 
   useEffect(() => {
     try {
-      localStorage.setItem('stepdb:leftW', String(leftW))
-      localStorage.setItem('stepdb:rightW', String(rightW))
+      localStorage.setItem('stepdb:leftW', String(stepsW))
+      localStorage.setItem('stepdb:rightW', String(editorW))
     } catch {
       // sin almacenamiento: se ignora
     }
-  }, [leftW, rightW])
+  }, [stepsW, editorW])
 
   useModelSync(project.data)
   useRealtime(projectId)
@@ -113,31 +116,23 @@ export default function EditorPage() {
     )
   }
 
-  // Los paneles nunca se comen el canvas: su ancho guardado se limita según la pantalla.
-  const leftWidth = Math.round(Math.min(leftW, Math.max(220, viewport * 0.24)))
-  const rightWidth = Math.round(Math.min(rightW, Math.max(320, viewport * 0.36)))
-
-  // En pantallas angostas solo un panel a la vez, flotando sobre el canvas.
-  const toggleLeft = () => {
-    setLeftOpen((v) => !v)
-    if (compact) setRightOpen(false)
-  }
-  const toggleRight = () => {
-    setRightOpen((v) => !v)
-    if (compact) setLeftOpen(false)
-  }
-  const overlay = 'sdb-panel-in absolute inset-y-0 z-30 max-w-[88vw] bg-white shadow-2xl'
+  // El panel nunca se come el canvas: su ancho guardado se limita según la pantalla.
+  // En pantallas angostas flota sobre el canvas, así que solo lo limita el ancho de la ventana.
+  const room = (share: number, min: number) => (compact ? viewport - RAIL_WIDTH - 24 : Math.max(min, viewport * share))
+  const panelWidth = Math.round(showsSteps ? Math.min(stepsW, room(0.24, 220)) : Math.min(editorW, room(0.4, 320)))
+  const resize = (dx: number) =>
+    showsSteps ? setStepsW((w) => Math.min(460, Math.max(220, w + dx))) : setEditorW((w) => Math.min(900, Math.max(320, w + dx)))
 
   return (
     <ReactFlowProvider>
       <div className="flex h-full flex-col overflow-hidden bg-white">
         <header className="flex h-12 shrink-0 items-center gap-2 border-b border-slate-200 px-2 sm:gap-3 sm:px-3">
           <button
-            className={`btn btn-ghost shrink-0 px-1.5 ${leftOpen ? 'text-slate-900' : 'text-slate-400'}`}
-            onClick={toggleLeft}
-            aria-label="Mostrar u ocultar el panel de steps"
-            aria-pressed={leftOpen}
-            title="Panel de steps"
+            className={`btn btn-ghost shrink-0 px-1.5 ${open ? 'text-slate-900' : 'text-slate-400'}`}
+            onClick={() => setOpen(!open)}
+            aria-label="Mostrar u ocultar el panel lateral"
+            aria-pressed={open}
+            title="Panel lateral"
           >
             <IconPanelLeft />
           </button>
@@ -154,28 +149,24 @@ export default function EditorPage() {
             {project.data.name}
           </span>
           <Toolbar project={project.data} />
-          <button
-            className={`btn btn-ghost shrink-0 px-1.5 ${rightOpen ? 'text-slate-900' : 'text-slate-400'}`}
-            onClick={toggleRight}
-            aria-label="Mostrar u ocultar el editor"
-            aria-pressed={rightOpen}
-            title="Panel del editor"
-          >
-            <IconPanelRight />
-          </button>
           <UserMenu />
         </header>
         <div className="relative flex min-h-0 flex-1">
-          {leftOpen && (
+          <SidebarRail />
+          {open && (
             <>
               <aside
-                className={compact ? `${overlay} left-0 border-r border-slate-200` : 'shrink-0 border-r border-slate-200'}
-                style={{ width: leftWidth }}
-                aria-label="Steps"
+                className={
+                  compact
+                    ? 'sdb-panel-in absolute inset-y-0 z-30 border-r border-slate-200 bg-white shadow-2xl'
+                    : 'shrink-0 border-r border-slate-200'
+                }
+                style={compact ? { left: RAIL_WIDTH, width: panelWidth } : { width: panelWidth }}
+                aria-label="Panel lateral"
               >
-                <StepsPanel project={project.data} />
+                <SidePanel project={project.data} />
               </aside>
-              {!compact && <Resizer side="left" onDrag={(dx) => setLeftW((w) => Math.min(460, Math.max(220, w + dx)))} />}
+              {!compact && <Resizer onDrag={resize} />}
             </>
           )}
           <div className="relative min-w-0 flex-1">
@@ -185,29 +176,14 @@ export default function EditorPage() {
             <ReplayOverlay workDates={Object.fromEntries(project.data.steps.map((s) => [s.id, s.workDate]))} />
             <LiveStatus />
             <Toasts />
-            {compact && (leftOpen || rightOpen) && (
+            {compact && open && (
               <button
                 className="sdb-overlay absolute inset-0 z-20 cursor-default bg-slate-900/10"
                 aria-label="Cerrar panel"
-                onClick={() => {
-                  setLeftOpen(false)
-                  setRightOpen(false)
-                }}
+                onClick={() => setOpen(false)}
               />
             )}
           </div>
-          {rightOpen && (
-            <>
-              {!compact && <Resizer side="right" onDrag={(dx) => setRightW((w) => Math.min(900, Math.max(320, w - dx)))} />}
-              <aside
-                className={compact ? `${overlay} right-0 border-l border-slate-200` : 'shrink-0 border-l border-slate-200'}
-                style={{ width: rightWidth }}
-                aria-label="Editor"
-              >
-                <SidePanel project={project.data} />
-              </aside>
-            </>
-          )}
         </div>
         <ConflictDialog onResolve={resolveConflict} />
         <SearchPalette />

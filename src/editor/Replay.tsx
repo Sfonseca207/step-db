@@ -75,8 +75,11 @@ export function ReplayOverlay({ workDates }: { workDates: Record<string, string>
     const t = setTimeout(() => {
       const cur = useEditorStore.getState().replay
       if (!cur) return
-      if (cur.stepIndex >= ordered.length - 1) setReplay({ ...cur, playing: false }, currentVisible())
-      else setReplay({ ...cur, stepIndex: cur.stepIndex + 1 }, currentVisible())
+      if (cur.stepIndex >= ordered.length - 1) {
+        // Terminó el último step: el replay se cierra solo y deja el diagrama completo encuadrado.
+        setReplay(null)
+        setTimeout(() => canvasActions.fitView(), 50)
+      } else setReplay({ ...cur, stepIndex: cur.stepIndex + 1 }, currentVisible())
     }, 2600 / replay.speed)
     return () => clearTimeout(t)
   }, [replay, ordered.length, setReplay])

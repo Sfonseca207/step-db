@@ -50,7 +50,7 @@ Requiere `.env` (ver `.env.example`). Los tests de integración usan `DATABASE_U
   - `modules/*/service.ts` contiene la lógica y los permisos; `routes.ts` y las tools MCP (`mcp/server.ts`) son delgadas y llaman a los mismos services. Todo acceso a un proyecto pasa por `assertProjectAccess` (ajeno → 404).
   - `files/service.ts#writeStepFile`: valida el proyecto completo con el contenido nuevo (422), control optimista por `version` (409), revisión, diff y `hub.publish('model.changed')`.
   - `auth/` Better Auth (Drizzle, lista blanca `ALLOWED_EMAILS`) y tokens de API (hash SHA-256). `mcp/` servidor MCP stateless (Streamable HTTP).
-- `src/` — React: `pages/` (login, proyectos, tokens), `editor/` (store Zustand, canvas React Flow en `canvas/`, paneles y Monaco en `panels/`, `drafts.ts` autoguardado con versión base, `realtime.ts` WebSocket).
+- `src/` — React: `pages/` (login, proyectos, tokens), `editor/` (store Zustand, canvas React Flow en `canvas/`, paneles y Monaco en `panels/` (autocompletado de DBML en `dbml-complete.ts`, lógica pura con tests, sobre el catálogo de `dbml-catalog.ts`), `drafts.ts` autoguardado con versión base, `realtime.ts` WebSocket).
 
 ## Stack y configuración
 
@@ -59,5 +59,6 @@ Requiere `.env` (ver `.env.example`). Los tests de integración usan `DATABASE_U
 - Opciones de TS relevantes: `verbatimModuleSyntax` (imports de tipos con `import type`), `erasableSyntaxOnly` (sin `enum`, `namespace` ni parameter properties: Node debe poder quitar los tipos), `allowImportingTsExtensions` (imports locales con `.ts`/`.tsx`), `noUnusedLocals`/`noUnusedParameters`.
 - ESLint aplica `react-hooks` (incluida `set-state-in-effect`) y `react-refresh` (los módulos de componentes solo exportan componentes: helpers y constantes van en archivos aparte).
 - En desarrollo se expone `window.__stepdb` (store y `setDraftContent`) para QA con Playwright; no existe en el build.
+- Monaco se importa desde `editor.api`, que no incluye las contribuciones del editor: las que se usan (sugerencias y snippets) se importan una a una en `panels/monaco.ts`. Hover, buscador y plegado no están cargados.
 - Al probar el editor con Playwright hay que **teclear** (`keyboard.type`), no pegar texto: así se detectó que React Flow capturaba Espacio y Backspace. Todo lo que contenga un editor Monaco va dentro de un elemento con clase `nokey`.
 - El atenuado de nodos va en el contenedor `.sdb-node`, no en el elemento que anima Motion (que escribe `opacity` en línea).

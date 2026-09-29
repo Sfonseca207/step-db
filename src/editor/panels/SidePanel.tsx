@@ -1,50 +1,60 @@
 import { useMemo, useState, type ReactNode } from 'react'
+import { IconCheck } from '../../components/icons.tsx'
 import type { ProjectDto } from '../../core/api.ts'
 import { LINT_RULE_LABELS } from '../../core/lint.ts'
 import { formatDiagnostic } from '../../core/model.ts'
 import type { DbmlKind, FileKind } from '../../core/types.ts'
 import { setDraftContent } from '../drafts.ts'
-import { fileKey, useEditorStore, type SidePanelTab } from '../store.ts'
+import { fileKey, useEditorStore, type CodeTab, type ExportTab } from '../store.ts'
+import { AllStepsEditor } from './AllStepsEditor.tsx'
 import { CodeEditor } from './CodeEditor.tsx'
+import { ALL_STEPS, fileLanguage, filePath, kindsOfTab } from './codeFiles.ts'
 import { ExportPanel } from './ExportPanel.tsx'
 import { HistoryPanel } from './HistoryPanel.tsx'
+import { ImportPanel } from './ImportPanel.tsx'
 import { NewTableButton } from './NewTableButton.tsx'
+import { SaveStatus } from './SaveStatus.tsx'
+import { sectionOf } from './sections.ts'
+import { StepsPanel } from './StepsPanel.tsx'
 
-const TABS: { id: SidePanelTab; label: string }[] = [
+const CODE_TABS: { id: CodeTab; label: string }[] = [
   { id: 'dbml', label: 'DBML' },
   { id: 'views', label: 'Vistas' },
   { id: 'notes', label: 'Notas' },
+]
+const EXPORT_TABS: { id: ExportTab; label: string }[] = [
   { id: 'mssql', label: 'SQL Server' },
   { id: 'mongo', label: 'Mongo' },
-  { id: 'warnings', label: '⚠' },
-  { id: 'history', label: 'Historial' },
+  { id: 'combined', label: 'DBML' },
 ]
 
-function SaveStatus({ stepId, kind }: { stepId: string; kind: FileKind }) {
-  const key = fileKey(stepId, kind)
-  const hasDraft = useEditorStore((s) => s.drafts[key] !== undefined)
-  const saving = useEditorStore((s) => s.saving[key] ?? 'idle')
-  const invalid = useEditorStore((s) => s.errors.length > 0 && (kind === 'model' || kind === 'mongo'))
-  let text = 'Guardado'
-  let cls = 'text-emerald-600'
-  if (saving === 'saving') {
-    text = 'Guardando…'
-    cls = 'text-slate-500'
-  } else if (hasDraft && invalid) {
-    text = 'Borrador (con errores)'
-    cls = 'text-amber-600'
-  } else if (saving === 'error' && hasDraft) {
-    text = 'Sin guardar'
-    cls = 'text-red-600'
-  } else if (hasDraft) {
-    text = 'Editando…'
-    cls = 'text-slate-500'
-  }
+/** Encabezado de sección: título a la izquierda y, si las hay, subpestañas a la derecha. */
+function SectionHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <span className={`text-[11px] font-medium ${cls}`} data-testid="save-status">
-      {text === 'Guardado' ? '✓ ' : ''}
-      {text}
-    </span>
+    <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-4">
+      <h2 className="text-xs font-semibold tracking-wider whitespace-nowrap text-slate-500 uppercase">{title}</h2>
+      {children}
+    </div>
+  )
+}
+
+function Segmented<T extends string>(props: { label: string; value: T; options: { id: T; label: string }[]; onChange: (id: T) => void }) {
+  return (
+    <div className="flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-0.5" role="radiogroup" aria-label={props.label}>
+      {props.options.map((o) => (
+        <button
+          key={o.id}
+          role="radio"
+          aria-checked={props.value === o.id}
+          onClick={() => props.onChange(o.id)}
+          className={`rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition ${
+            props.value === o.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   )
 }
 
@@ -52,7 +62,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   return (
     <button
       onClick={onClick}
-      className={`rounded-md px-2 py-0.5 text-xs font-medium transition ${
+      className={`rounded-md px-2 py-0.5 text-xs font-medium whitespace-nowrap transition ${
         active ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100'
       }`}
     >
@@ -61,11 +71,19 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   )
 }
 
+/** Panel lateral único: la línea de tiempo de steps o una de las vistas del editor. */
 export function SidePanel({ project }: { project: ProjectDto }) {
+  const steps = useEditorStore((s) => s.sideTab === 'steps')
+  return steps ? <StepsPanel project={project} /> : <EditorPanel project={project} />
+}
+
+function EditorPanel({ project }: { project: ProjectDto }) {
   const tab = useEditorStore((s) => s.sideTab)
   const setTab = useEditorStore((s) => s.setSideTab)
   const selectedStepId = useEditorStore((s) => s.selectedStepId)
   const selectStep = useEditorStore((s) => s.selectStep)
+  const codeScope = useEditorStore((s) => s.codeScope)
+  const setCodeScope = useEditorStore((s) => s.setCodeScope)
   const drafts = useEditorStore((s) => s.drafts)
   const errors = useEditorStore((s) => s.errors)
   const warnings = useEditorStore((s) => s.warnings)
@@ -111,45 +129,63 @@ export function SidePanel({ project }: { project: ProjectDto }) {
     revealRequest && revealRequest.stepId === step.id && revealRequest.kind === editKind
       ? { line: revealRequest.line, token: revealRequest.token }
       : null
-  const isEditable = tab === 'dbml' || tab === 'views' || tab === 'notes'
+  const section = sectionOf(tab)
+  const isEditable = section === 'code'
+  /** Todos los steps a la vez (solo en las pestañas de código). */
+  const allSteps = isEditable && codeScope === 'all'
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-white">
-      <div className="sdb-no-scrollbar flex shrink-0 items-center gap-0.5 overflow-x-auto border-b border-slate-200 px-2 pt-2">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`relative rounded-t-lg px-2.5 py-1.5 text-xs font-medium whitespace-nowrap transition ${
-              tab === t.id ? 'bg-white text-slate-900' : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            {t.id === 'warnings' ? `⚠ ${warnings.length}` : t.label}
-            {tab === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-slate-900" />}
-          </button>
-        ))}
-      </div>
+      {section === 'code' && (
+        <SectionHeader title="Código">
+          <Segmented label="Archivo del step" value={tab as CodeTab} options={CODE_TABS} onChange={setTab} />
+        </SectionHeader>
+      )}
+      {section === 'export' && (
+        <SectionHeader title="Exportar">
+          <Segmented label="Destino de la exportación" value={tab as ExportTab} options={EXPORT_TABS} onChange={setTab} />
+        </SectionHeader>
+      )}
+      {section === 'import' && <SectionHeader title="Importar" />}
+      {section === 'warnings' && <SectionHeader title={`Advertencias · ${warnings.length}`} />}
+      {section === 'history' && <SectionHeader title="Historial" />}
 
       {(isEditable || tab === 'history') && (
         <div className="flex shrink-0 items-center gap-2 border-b border-slate-100 px-3 py-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: step.color }} />
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ background: allSteps ? `conic-gradient(${project.steps.map((s) => s.color).join(', ')})` : step.color }}
+          />
           <select
             className="min-w-0 flex-1 truncate rounded-md border-none bg-transparent py-0.5 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-slate-200"
-            value={step.id}
-            onChange={(e) => selectStep(e.target.value)}
+            value={allSteps ? ALL_STEPS : step.id}
+            onChange={(e) => {
+              const all = e.target.value === ALL_STEPS
+              if (isEditable) setCodeScope(all ? 'all' : 'step')
+              if (!all) selectStep(e.target.value)
+            }}
             aria-label="Step del archivo"
           >
+            {isEditable && <option value={ALL_STEPS}>Todos los steps</option>}
             {project.steps.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.slug}
               </option>
             ))}
           </select>
-          {isEditable && <SaveStatus stepId={step.id} kind={editKind} />}
+          {isEditable && (
+            <SaveStatus
+              files={
+                allSteps
+                  ? project.steps.flatMap((s) => kindsOfTab(tab as CodeTab).map((kind) => ({ stepId: s.id, kind })))
+                  : [{ stepId: step.id, kind: editKind }]
+              }
+            />
+          )}
         </div>
       )}
 
-      {tab === 'dbml' && (
+      {tab === 'dbml' && !allSteps && (
         <div className="flex shrink-0 items-center gap-1 px-3 py-1.5">
           <Chip active={dbmlKind === 'model'} onClick={() => setDbmlKind('model')}>
             SQL Server · {counts.model}
@@ -164,11 +200,12 @@ export function SidePanel({ project }: { project: ProjectDto }) {
       )}
 
       <div className="relative min-h-0 flex-1">
-        {isEditable && (
+        {allSteps && <AllStepsEditor project={project} tab={tab as CodeTab} />}
+        {isEditable && !allSteps && (
           <CodeEditor
-            path={`file:///${step.id}/${editKind}.${editKind === 'views' ? 'sql' : editKind === 'notes' ? 'md' : 'dbml'}`}
+            path={filePath(step.id, editKind)}
             value={value}
-            language={editKind === 'views' ? 'sql' : editKind === 'notes' ? 'markdown' : 'dbml'}
+            language={fileLanguage(editKind)}
             diagnostics={fileDiagnostics}
             reveal={reveal}
             onChange={(v) => setDraftContent(project, step.id, editKind, v)}
@@ -176,11 +213,16 @@ export function SidePanel({ project }: { project: ProjectDto }) {
         )}
         {tab === 'mssql' && <ExportPanel project={project} target="mssql" />}
         {tab === 'mongo' && <ExportPanel project={project} target="mongo" />}
+        {tab === 'combined' && <ExportPanel project={project} target="dbml" />}
+        {tab === 'import' && <ImportPanel project={project} />}
         {tab === 'history' && <HistoryPanel project={project} step={step} />}
         {tab === 'warnings' && (
           <div className="h-full overflow-y-auto p-3">
             {warnings.length === 0 ? (
-              <p className="p-4 text-center text-sm text-slate-400">Sin advertencias del linter. ✨</p>
+              <p className="flex items-center justify-center gap-1.5 p-4 text-sm text-slate-400">
+                <IconCheck className="text-emerald-600" />
+                Sin advertencias del linter.
+              </p>
             ) : (
               <ul className="space-y-1.5">
                 {warnings.map((w, i) => (

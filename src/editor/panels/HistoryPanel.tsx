@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
+import { IconArrowLeft } from '../../components/icons.tsx'
 import type { ProjectDto, RevisionDto, StepDto } from '../../core/api.ts'
 import { FILE_KINDS, type FileKind } from '../../core/types.ts'
 import { api } from '../../lib/api.ts'
@@ -55,7 +56,8 @@ export function HistoryPanel({ project, step }: { project: ProjectDto; step: Ste
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="flex items-center gap-2 border-y border-slate-100 px-3 py-1.5 text-xs">
             <button className="btn px-2 py-0.5 text-xs" onClick={() => setPreview(null)}>
-              ← Volver
+              <IconArrowLeft width={12} height={12} />
+              Volver
             </button>
             <span className="text-slate-500">v{preview.version}</span>
             <button className="btn btn-primary ml-auto px-2 py-0.5 text-xs" onClick={() => restore(preview)} disabled={preview.version === current.version}>
