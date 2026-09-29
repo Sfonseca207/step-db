@@ -621,6 +621,8 @@ El agente crea `.env` local con valores de desarrollo (no es un secreto real) y 
 
 ### 13.2 Qué debe dejar listo la implementación
 
+> **Nota (2026-09-29):** Railway dejó de leer `railway.json` en servicios nuevos. Esta configuración se aplicó en los ajustes del servicio y el archivo se eliminó (decisión I62 de `DECISIONES.md`).
+
 - **`railway.json`** en el repo:
   - build: `npm run build`
   - pre-deploy: `npm run db:migrate` (si falla, Railway cancela el despliegue y la versión anterior sigue arriba)

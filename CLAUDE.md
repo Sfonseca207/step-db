@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 StepDB: aplicación web para modelar bases de datos por "steps" (etapas), estilo dbdiagram.io. Frontend React + backend Node/Hono en el mismo repo, Postgres como fuente de verdad, sincronización en vivo por WebSocket y servidor MCP (`/mcp`) para que agentes lean y escriban el modelo. **La especificación completa del MVP está en `docs/SPEC-MVP.md`: leerla antes de implementar.** Las decisiones tomadas durante la implementación se registran en `docs/DECISIONES.md` y lo no terminado en `docs/PENDIENTES.md`. El resumen de la implementación del MVP está en `docs/RESUMEN-NOCHE.md` y el informe del QA en `docs/QA.md`.
 
-El MVP (fases 0–8 de la spec) está implementado y probado en local; aún no se ha desplegado en Railway.
+El MVP (fases 0–8 de la spec) está implementado y desplegado en el entorno `development` de Railway (<https://step-db-development-dd0b.up.railway.app>); `production` aún no se ha desplegado.
 
 ## Reglas de git
 
@@ -16,6 +16,9 @@ El MVP (fases 0–8 de la spec) está implementado y probado en local; aún no s
 ## Entornos y Railway
 
 - La app se despliega en Railway como un solo servicio (`step-db`) + Postgres. Detalles e ids en `docs/SPEC-MVP.md` §13; variables por entorno en `README.md`.
+- La configuración de build y despliegue (build, pre-deploy `npm run db:migrate`, start, healthcheck, `watchPatterns`) vive en los ajustes del servicio en Railway, por entorno; no hay `railway.json` porque Railway ya no lo lee en servicios nuevos. La tabla está en `README.md`.
+- Cada push a `development` despliega en el entorno `development`, salvo que solo toque archivos fuera de los `watchPatterns` (documentación, `scripts/`). Si el servidor empieza a importar una carpeta nueva, hay que agregarla a esa lista en Railway.
+- El servicio corre con una sola réplica: el hub de tiempo real y el rate limiting viven en memoria.
 - **Nunca tocar el entorno `production` de Railway** sin que el usuario lo pida explícitamente en ese momento.
 - Nunca usar los servidores MCP de bases de datos del entorno (AUTOGAS, HO40, VANTI, gasdata40, sunset, etc.): son bases reales ajenas a este proyecto.
 
@@ -36,6 +39,7 @@ npx vitest run src/core -u                 # regenerar snapshots de exportadores
 npm run db:generate    # nueva migración tras cambiar server/db/schema.ts
 npm run db:down
 STEPDB_TOKEN=sdb_… node scripts/mcp-smoke.ts http://localhost:8787/mcp [--demo]   # humo del MCP
+STEPDB_EMAIL=… STEPDB_PASSWORD=… node scripts/deploy-smoke.ts https://<dominio> [--signup]   # humo de un entorno desplegado
 ```
 
 Requiere `.env` (ver `.env.example`). Los tests de integración usan `DATABASE_URL_TEST` (la configura `vitest.config.ts`) y vacían las tablas entre casos, así que no corren en paralelo por archivo.

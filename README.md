@@ -84,9 +84,25 @@ Los tokens se pueden revocar desde la misma página; un token revocado recibe `4
 
 El servidor valida estas variables con zod al arrancar y no inicia si falta alguna.
 
-## Despliegue en Railway (preparado, no ejecutado)
+## Despliegue en Railway
 
-`railway.json` define: build `npm run build`, pre-deploy `npm run db:migrate` (si falla, Railway mantiene la versión anterior), start `npm start` y healthcheck `/health`.
+| Entorno | Rama | URL | Estado |
+|---|---|---|---|
+| development | `development` | <https://step-db-development-dd0b.up.railway.app> | desplegado |
+| production | `main` | <https://step-db-production.up.railway.app> | pendiente |
+
+Cada push a la rama del entorno despliega solo. La configuración de build y despliegue vive en **los ajustes del servicio en Railway**, por entorno (Railway ya no lee `railway.json` en servicios nuevos):
+
+| Ajuste | Valor |
+|---|---|
+| Builder | Railpack; toma la versión de Node de `engines.node` |
+| Build command | `npm run build` |
+| Pre-deploy command | `npm run db:migrate` (límite de 300 s). Si falla, Railway cancela el despliegue y la versión anterior sigue arriba |
+| Start command | `npm start` |
+| Healthcheck | `/health`, 60 s (responde 503 si la base no contesta) |
+| Restart policy | `ON_FAILURE` |
+| Watch patterns | `src/**`, `server/**`, `public/**`, `index.html`, `package.json`, `package-lock.json`, `vite.config.ts`, `tsconfig*.json`. Un commit que solo toca documentación o `scripts/` no despliega |
+| Réplicas | 1, sin modo serverless |
 
 Variables por entorno del servicio `step-db`:
 
@@ -99,7 +115,17 @@ Variables por entorno del servicio `step-db`:
 | `BETTER_AUTH_SECRET` | secreto propio | secreto propio (distinto) |
 | `ALLOWED_EMAILS` | correos permitidos | correos permitidos |
 
-Con `NODE_ENV=production` las cookies son `Secure` y se activa HSTS. Conexión MCP remota:
+Con `NODE_ENV=production` las cookies son `Secure` y se activa HSTS. La IP del cliente para el rate limiting se lee de `x-real-ip`, que pone el proxy de Railway.
+
+La réplica única es obligatoria: el hub de tiempo real y el rate limiting viven en la memoria del proceso.
+
+Verificar un entorno desplegado (health, UI, auth, API, WebSocket y MCP):
+
+```bash
+STEPDB_EMAIL=… STEPDB_PASSWORD=… node scripts/deploy-smoke.ts https://<dominio> [--signup]
+```
+
+Conexión MCP remota:
 
 ```bash
 claude mcp add --transport http stepdb https://<dominio>/mcp --header "Authorization: Bearer sdb_…"

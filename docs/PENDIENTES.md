@@ -24,8 +24,17 @@ Estado de los ítems P1/P2 de la fase 8 y de lo que quedó fuera del MVP. Las de
 - [ ] **Modelar desde el móvil**: debajo de 1024 px los paneles flotan sobre el canvas; sirve para consultar, no para escribir DBML con comodidad.
 - [ ] **El slug de un step conserva su número original al reordenar** (decisión I13): el selector de archivos puede mostrar `06-turnos` para el step que quedó en la posición 04.
 - [ ] **Depuración de revisiones antiguas** (backlog de la spec).
-- [ ] **Rate limiting por IP detrás del proxy de Railway**: Better Auth usa `x-forwarded-for`; conviene fijar `advanced.ipAddress` al desplegar.
 - [ ] **PGlite** (plan B sin Docker) no se implementó porque Docker estuvo disponible; `DB_DRIVER` solo acepta `postgres`.
+
+## Despliegue
+
+- [x] **Entorno `development` en Railway** (2026-09-29): variables y ajustes del servicio configurados, migraciones en el pre-deploy y verificación con `scripts/deploy-smoke.ts`.
+- [x] **Rate limiting por IP detrás del proxy de Railway**: Better Auth lee `x-real-ip` (decisión I61).
+- [ ] **Entorno `production`**: mismas variables con `${{Postgres.DATABASE_URL}}`, secreto propio y su dominio, y los mismos ajustes del servicio que `development` (tabla del `README.md`); PR de `development` a `main`. Solo cuando se pida.
+- [ ] **Infrastructure as Code** (`.railway/railway.ts`): versionar los ajustes del servicio, que hoy solo están en Railway (decisión I62).
+- [ ] **Backups del volumen de Postgres** antes de guardar datos reales en `production`.
+- [ ] **CI antes de desplegar**: hoy cada push a `development` despliega sin correr lint ni tests. Falta un workflow de GitHub Actions y activar "Wait for CI" en el servicio.
+- [ ] **Más de una réplica**: el hub de tiempo real y el rate limiting viven en memoria; escalar exige un pub/sub (por ejemplo `LISTEN/NOTIFY` de Postgres).
 
 ## Resuelto en el QA del 2026-09-29
 
