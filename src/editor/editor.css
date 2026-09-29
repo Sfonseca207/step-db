@@ -159,7 +159,7 @@
 
 /* Aristas */
 .sdb-edge path {
-  transition: stroke-width 150ms ease, opacity 250ms ease;
+  transition: opacity 250ms ease;
 }
 .sdb-edge-dimmed {
   opacity: 0.12;
@@ -285,7 +285,7 @@
 }
 
 .sdb-replay-label {
-  animation: sdb-label-in 450ms cubic-bezier(0.2, 0.8, 0.3, 1.2);
+  animation: sdb-label-in 450ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 @keyframes sdb-label-in {
   from {
