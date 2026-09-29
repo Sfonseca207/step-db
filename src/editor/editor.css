@@ -1,0 +1,213 @@
+/* Canvas: fondo blanco con cuadrícula de puntos sutil (SPEC §10.2) */
+.sdb-canvas .react-flow__pane {
+  cursor: default;
+}
+.sdb-canvas .react-flow__node {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.sdb-table {
+  min-width: 230px;
+  max-width: 420px;
+  border: 1.5px solid var(--step-border);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 12px;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 14px -6px rgb(15 23 42 / 0.12);
+  transition: opacity 250ms ease, filter 250ms ease, box-shadow 250ms ease, border-color 250ms ease;
+}
+.sdb-table.sdb-mongo {
+  border-style: dashed;
+  border-width: 2px;
+  border-radius: 18px;
+}
+.sdb-table.sdb-dimmed {
+  opacity: 0.2;
+  filter: grayscale(1);
+}
+.sdb-table.sdb-selected {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--step) 35%, transparent), 0 10px 30px -10px rgb(15 23 42 / 0.35);
+}
+.sdb-table.sdb-new {
+  animation: sdb-glow 2s ease-out;
+}
+@keyframes sdb-glow {
+  0%,
+  35% {
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--step) 45%, transparent), 0 0 34px 6px var(--step);
+  }
+  100% {
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.06), 0 4px 14px -6px rgb(15 23 42 / 0.12);
+  }
+}
+
+.sdb-table-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 8px 0 10px;
+  font-size: 12.5px;
+  letter-spacing: 0.01em;
+  transition: background-color 400ms ease, color 400ms ease;
+}
+.sdb-step-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 1px 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: color 400ms ease, background-color 400ms ease;
+}
+.sdb-warn-badge {
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  background: #fef3c7;
+  color: #92400e;
+}
+.sdb-warn-badge + .sdb-step-badge {
+  margin-left: 4px;
+}
+.sdb-table-body {
+  padding: 4px 0 6px;
+}
+.sdb-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 22px;
+  padding: 0 10px;
+  color: #1e293b;
+}
+.sdb-row:hover {
+  background: color-mix(in srgb, var(--step) 8%, transparent);
+}
+.sdb-row-hover {
+  background: color-mix(in srgb, var(--step) 18%, transparent) !important;
+  font-weight: 600;
+}
+.sdb-row-synthetic {
+  color: #64748b;
+  font-style: italic;
+}
+.sdb-row-flash {
+  animation: sdb-flash 1.8s ease-out;
+}
+@keyframes sdb-flash {
+  0%,
+  30% {
+    background: #fef08a;
+  }
+  100% {
+    background: transparent;
+  }
+}
+.sdb-row-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.sdb-tree {
+  color: #cbd5e1;
+  margin-right: -2px;
+}
+.sdb-col-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px white;
+}
+.sdb-row-type {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: #64748b;
+  white-space: nowrap;
+}
+.sdb-flag {
+  border-radius: 4px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  color: #475569;
+  background: #f1f5f9;
+}
+.sdb-handle {
+  width: 6px !important;
+  height: 6px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  opacity: 0;
+}
+
+/* Aristas */
+.sdb-edge path {
+  transition: stroke-width 150ms ease, opacity 250ms ease;
+}
+.sdb-edge-dimmed {
+  opacity: 0.12;
+}
+.sdb-edge-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: sdb-draw 900ms ease-out forwards;
+}
+@keyframes sdb-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.sdb-edge-ants {
+  stroke-dasharray: 7 5;
+  animation: sdb-ants 0.8s linear infinite;
+}
+.sdb-edge-ants-logical {
+  animation: sdb-ants 0.8s linear infinite;
+}
+@keyframes sdb-ants {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+.sdb-edge-label {
+  position: absolute;
+  pointer-events: all;
+  border: 1px dashed #94a3b8;
+  border-radius: 999px;
+  background: white;
+  padding: 1px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569;
+  transition: opacity 250ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sdb-edge-ants,
+  .sdb-edge-ants-logical,
+  .sdb-edge-draw,
+  .sdb-table.sdb-new,
+  .sdb-row-flash {
+    animation: none !important;
+  }
+  .sdb-edge-draw {
+    stroke-dashoffset: 0;
+  }
+}
