@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { ProjectDto } from '../core/api.ts'
 import { IconHull, IconLayout } from '../components/icons.tsx'
 import { canvasActions } from './canvas/actions.ts'
+import { ExportMenu } from './ExportMenu.tsx'
 import { useEditorStore, type FocusMode } from './store.ts'
 
 const MODES: { id: FocusMode; label: string; title: string }[] = [
@@ -67,6 +68,7 @@ export function Toolbar({ project }: { project: ProjectDto }) {
         <IconHull />
         Fondos
       </button>
+      <ExportMenu project={project} />
     </div>
   )
 }

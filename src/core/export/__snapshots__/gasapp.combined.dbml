@@ -1,0 +1,162 @@
+// GasApp (ejemplo) · DBML combinado (StepDB → dbdiagram.io)
+
+Enum ventas.estado_venta {
+  registrada [note: 'Recibida desde el surtidor']
+  anulada
+}
+
+// Step 01 · Recepción de ventas
+Table core.estacion [headercolor: #E5484D, note: 'Estación de servicio'] {
+  id int [pk, increment]
+  codigo varchar(10) [not null, unique]
+  nombre nvarchar(120) [not null]
+  ciudad nvarchar(80) [not null]
+  activa bit [not null, default: 1]
+}
+
+Table ventas.producto [headercolor: #E5484D, note: 'Combustibles y productos de tienda'] {
+  id int [pk, increment]
+  codigo varchar(20) [not null, unique]
+  nombre nvarchar(80) [not null]
+  unidad varchar(10) [not null, note: 'galón, litro, unidad']
+}
+
+Table ventas.venta [headercolor: #E5484D, note: 'Venta registrada en una estación'] {
+  id bigint [pk, increment]
+  estacion_id int [not null]
+  producto_id int [not null]
+  fecha datetime2 [not null, default: `sysutcdatetime()`]
+  cantidad decimal(12,3) [not null]
+  precio_unitario decimal(18,2) [not null]
+  total decimal(18,2) [not null]
+  estado ventas.estado_venta [not null, default: 'registrada']
+  tercero_id bigint [note: 'Cliente identificado en la venta']
+  facturada bit [not null, default: 0]
+
+  indexes {
+    (estacion_id, fecha) [name: 'ix_venta_estacion_fecha']
+    producto_id [name: 'ix_venta_producto']
+  }
+}
+
+Table ventas.venta_pago [headercolor: #E5484D, note: 'Medios de pago de la venta'] {
+  id bigint [pk, increment]
+  venta_id bigint [not null]
+  medio_pago varchar(20) [not null]
+  valor decimal(18,2) [not null]
+
+  indexes {
+    venta_id [name: 'ix_venta_pago_venta']
+  }
+}
+
+// Step 02 · Terceros y clientes
+Table terceros.tercero [headercolor: #3E63DD, note: 'Persona natural o jurídica'] {
+  id bigint [pk, increment]
+  tipo_documento varchar(5) [not null, note: 'CC, NIT, CE, PAS']
+  numero_documento varchar(20) [not null]
+  razon_social nvarchar(160) [not null]
+  email varchar(160)
+
+  indexes {
+    (tipo_documento, numero_documento) [unique, name: 'ux_tercero_documento']
+  }
+}
+
+Table terceros.vehiculo [headercolor: #3E63DD, note: 'Vehículos asociados a un cliente (flotas)'] {
+  id bigint [pk, increment]
+  tercero_id bigint [not null]
+  placa varchar(10) [not null, unique]
+
+  indexes {
+    tercero_id [name: 'ix_vehiculo_tercero']
+  }
+}
+
+// Step 03 · Facturación
+Table facturacion.resolucion [headercolor: #30A46C, note: 'Resolución de numeración DIAN'] {
+  id int [pk, increment]
+  prefijo varchar(10) [not null]
+  desde bigint [not null]
+  hasta bigint [not null]
+  vigente_hasta date [not null]
+}
+
+Table facturacion.factura [headercolor: #30A46C, note: 'Factura electrónica emitida por venta'] {
+  id bigint [pk, increment]
+  venta_id bigint [not null, unique]
+  tercero_id bigint [not null]
+  resolucion_id int [not null]
+  numero varchar(30) [not null, unique]
+  fecha_emision datetime2 [not null]
+  total decimal(18,2) [not null]
+  cufe varchar(96) [note: 'Código único de factura electrónica']
+
+  indexes {
+    tercero_id [name: 'ix_factura_tercero']
+    resolucion_id [name: 'ix_factura_resolucion']
+  }
+}
+
+// Step 04 · Log de integraciones
+Table mongo.log_envio_venta [headercolor: #F76B15, note: 'Trazabilidad de envíos de ventas a servicios externos'] {
+  _id objectId [pk]
+  venta_id long [not null]
+  servicio string [not null, note: 'dian | erp | fidelizacion']
+  estado string [not null, note: 'pendiente | enviado | error']
+  "respuesta.codigo" int
+  "respuesta.mensaje" string
+  intentos int [not null, default: 0]
+  creado_en date [not null]
+
+  indexes {
+    (venta_id, servicio)
+    estado
+  }
+}
+
+Table mongo.log_evento_factura [headercolor: #F76B15, note: 'Eventos DIAN recibidos por factura'] {
+  _id objectId [pk]
+  factura_id long [not null]
+  evento string [not null]
+  payload object
+  etiquetas "array<string>"
+  recibido_en date [not null]
+
+  indexes {
+    factura_id
+  }
+}
+
+Ref: ventas.venta.estacion_id > core.estacion.id
+Ref: ventas.venta.producto_id > ventas.producto.id
+Ref: ventas.venta_pago.venta_id > ventas.venta.id
+Ref: terceros.vehiculo.tercero_id > terceros.tercero.id
+Ref: ventas.venta.tercero_id > terceros.tercero.id
+Ref: ventas.venta.id - facturacion.factura.venta_id
+Ref: facturacion.factura.tercero_id > terceros.tercero.id
+Ref: facturacion.factura.resolucion_id > facturacion.resolucion.id
+Ref: mongo.log_envio_venta.venta_id > ventas.venta.id
+Ref: mongo.log_evento_factura.factura_id > facturacion.factura.id
+
+TableGroup step_01_recepcion_ventas [color: #E5484D, note: 'Recepción de ventas'] {
+  core.estacion
+  ventas.producto
+  ventas.venta
+  ventas.venta_pago
+}
+
+TableGroup step_02_terceros_clientes [color: #3E63DD, note: 'Terceros y clientes'] {
+  terceros.tercero
+  terceros.vehiculo
+}
+
+TableGroup step_03_facturacion [color: #30A46C, note: 'Facturación'] {
+  facturacion.resolucion
+  facturacion.factura
+}
+
+TableGroup step_04_log_integraciones [color: #F76B15, note: 'Log de integraciones'] {
+  mongo.log_envio_venta
+  mongo.log_evento_factura
+}

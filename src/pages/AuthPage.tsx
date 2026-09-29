@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router'
+import { Link, Navigate, useLocation, useNavigate } from 'react-router'
 import { Logo } from '../components/Logo.tsx'
 import { signIn, signUp, useSession } from '../lib/auth-client.ts'
 
@@ -7,6 +7,8 @@ const STEP_COLORS = ['#E5484D', '#3E63DD', '#30A46C', '#F76B15', '#8E4EC6', '#12
 
 export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const navigate = useNavigate()
+  const location = useLocation()
+  const from = (location.state as { from?: string } | null)?.from ?? '/'
   const session = useSession()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -14,7 +16,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  if (session.data) return <Navigate to="/" replace />
+  if (session.data) return <Navigate to={from} replace />
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -41,7 +43,7 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
         return
       }
       await session.refetch()
-      navigate('/', { replace: true })
+      navigate(from, { replace: true })
     } catch {
       setError('No se pudo conectar con el servidor.')
     } finally {
@@ -105,9 +107,9 @@ export default function AuthPage({ mode }: { mode: 'login' | 'register' }) {
           </button>
           <p className="mt-4 text-center text-sm text-slate-500">
             {mode === 'login' ? (
-              <>¿No tienes cuenta? <Link className="font-medium text-slate-900 underline-offset-2 hover:underline" to="/register">Regístrate</Link></>
+              <>¿No tienes cuenta? <Link className="font-medium text-slate-900 underline-offset-2 hover:underline" to="/register" state={location.state}>Regístrate</Link></>
             ) : (
-              <>¿Ya tienes cuenta? <Link className="font-medium text-slate-900 underline-offset-2 hover:underline" to="/login">Inicia sesión</Link></>
+              <>¿Ya tienes cuenta? <Link className="font-medium text-slate-900 underline-offset-2 hover:underline" to="/login" state={location.state}>Inicia sesión</Link></>
             )}
           </p>
         </form>

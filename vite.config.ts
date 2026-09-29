@@ -11,8 +11,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      '/api': { target: API, changeOrigin: false },
-      '/mcp': { target: API, changeOrigin: false },
+      '/api': { target: API, changeOrigin: false, xfwd: true },
+      '/mcp': { target: API, changeOrigin: false, xfwd: true },
       '/health': { target: API, changeOrigin: false },
       '/ws': { target: API, ws: true, changeOrigin: false },
     },

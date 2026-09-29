@@ -232,3 +232,30 @@ describe('guardado de archivos', () => {
     }
   })
 })
+
+describe('exportación', () => {
+  it('exporta SQL Server, Mongo y DBML completos y por step', async () => {
+    const u = await createUser()
+    const p = await exampleProject(u)
+    const sqlRes = await request('GET', `/api/projects/${p.id}/export/mssql`, { cookie: u.cookie })
+    expect(sqlRes.status).toBe(200)
+    expect(sqlRes.headers.get('content-type')).toMatch(/text\/plain/)
+    const sqlText = await sqlRes.text()
+    expect(sqlText).toMatch(/CREATE TABLE \[ventas\]\.\[venta\]/)
+    expect(sqlText).not.toMatch(/log_envio_venta/)
+
+    const step = await request('GET', `/api/projects/${p.id}/export/mssql?step=03-facturacion&idempotent=1&download=1`, {
+      cookie: u.cookie,
+    })
+    expect(step.headers.get('content-disposition')).toMatch(/_03-facturacion\.sql"/)
+    expect(await step.text()).toMatch(/IF OBJECT_ID\(N'facturacion\.factura', N'U'\) IS NULL/)
+
+    const mongo = await (await request('GET', `/api/projects/${p.id}/export/mongo`, { cookie: u.cookie })).text()
+    expect(mongo).toMatch(/db\.createCollection\("log_envio_venta"/)
+    const dbml = await (await request('GET', `/api/projects/${p.id}/export/dbml`, { cookie: u.cookie })).text()
+    expect(dbml).toMatch(/TableGroup/)
+
+    expect((await request('GET', `/api/projects/${p.id}/export/pdf`, { cookie: u.cookie })).status).toBe(404)
+    expect((await request('GET', `/api/projects/${p.id}/export/mssql?step=99-nada`, { cookie: u.cookie })).status).toBe(404)
+  })
+})

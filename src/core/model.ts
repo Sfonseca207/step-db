@@ -399,6 +399,16 @@ export function buildProjectModel(
     }
   }
 
+  // Orden de definición: step, archivo (model antes que mongo) y línea.
+  const stepPos = new Map(steps.map((s) => [s.id, s.position]))
+  const kindOrder = { model: 0, mongo: 1 } as const
+  tables.sort(
+    (a, b) =>
+      (stepPos.get(a.stepId) ?? 0) - (stepPos.get(b.stepId) ?? 0) ||
+      kindOrder[a.loc.kind] - kindOrder[b.loc.kind] ||
+      a.loc.startLine - b.loc.startLine,
+  )
+
   const model: ProjectModel = { tables, relations, enums }
   if (errors.length > 0) return { model: null, errors: dedupeDiagnostics(errors) }
   return { model, errors: [] }

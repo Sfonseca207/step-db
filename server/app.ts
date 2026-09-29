@@ -8,6 +8,7 @@ import { pingDb } from './db/client.ts'
 import { HttpError } from './lib/errors.ts'
 import { requireToken, requireUser, type AuthVars } from './middleware/auth.ts'
 import { originGuard, securityHeaders } from './middleware/security.ts'
+import { exportRoutes } from './modules/export/routes.ts'
 import { fileRoutes } from './modules/files/routes.ts'
 import { projectRoutes } from './modules/projects/routes.ts'
 import { projectStepRoutes, stepRoutes } from './modules/steps/routes.ts'
@@ -52,6 +53,7 @@ export function createApp() {
   api.get('/me', (c) => c.json({ id: c.get('userId'), email: c.get('userEmail'), name: c.get('userName') }))
   api.route('/projects', projectRoutes)
   api.route('/projects', projectStepRoutes)
+  api.route('/projects', exportRoutes)
   api.route('/steps', stepRoutes)
   api.route('/steps', fileRoutes)
   api.route('/tokens', tokenRoutes)
