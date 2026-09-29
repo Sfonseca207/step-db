@@ -1,4 +1,4 @@
-import { Parser } from '@dbml/core'
+import { Compiler, DEFAULT_ENTRY, MemoryProjectLayout } from '@dbml/parse'
 import { translateParserMessage } from './messages.ts'
 import { DEFAULT_CONVENTIONS, type Conventions } from './schemas.ts'
 import type {
@@ -17,7 +17,9 @@ import type {
 } from './types.ts'
 
 /* ------------------------------------------------------------------ */
-/* Estructuras mínimas del modelo de @dbml/core que usamos.            */
+/* Estructuras mínimas de la salida de @dbml/parse que usamos.          */
+/* (Se usa el parser directamente y no @dbml/core, que pesa ~20 MB     */
+/* por incluir los importadores de todos los motores SQL.)             */
 /* ------------------------------------------------------------------ */
 
 interface RawPos {
@@ -28,6 +30,9 @@ interface RawToken {
   start: RawPos
   end: RawPos
 }
+interface RawNote {
+  value: string
+}
 interface RawField {
   name: string
   type: { schemaName: string | null; type_name: string; args: string | null }
@@ -35,11 +40,10 @@ interface RawField {
   not_null?: boolean
   unique?: boolean
   increment?: boolean
-  note?: string | null
+  note?: RawNote | null
   dbdefault?: { type: string; value: string | number | boolean } | null
   metadata?: Record<string, unknown> | null
   token?: RawToken
-  injectedPartial?: unknown
 }
 interface RawIndex {
   columns: { type: string; value: string }[]
@@ -50,12 +54,22 @@ interface RawIndex {
 }
 interface RawTable {
   name: string
-  note?: string | null
+  schemaName: string | null
+  note?: RawNote | null
   headerColor?: string | null
   metadata?: Record<string, unknown> | null
   fields: RawField[]
   indexes: RawIndex[]
+  /** Referencias `~parcial` dentro de la tabla, con su posición entre las columnas. */
+  partials?: { order: number; name: string }[]
   token: RawToken
+}
+interface RawPartial {
+  name: string
+  fields: RawField[]
+  indexes: RawIndex[]
+  note?: RawNote | null
+  headerColor?: string | null
 }
 interface RawEndpoint {
   schemaName: string | null
@@ -64,7 +78,6 @@ interface RawEndpoint {
   relation: '1' | '*'
 }
 interface RawRef {
-  id: number
   name?: string | null
   onDelete?: string | null
   onUpdate?: string | null
@@ -73,21 +86,52 @@ interface RawRef {
 }
 interface RawEnum {
   name: string
-  values: { name: string; note?: string | null }[]
+  schemaName: string | null
+  values: { name: string; note?: RawNote | null }[]
   token: RawToken
 }
-interface RawSchema {
-  name: string
+interface RawDatabase {
   tables: RawTable[]
   refs: RawRef[]
   enums: RawEnum[]
+  tablePartials?: RawPartial[]
 }
-interface RawDatabase {
-  schemas: RawSchema[]
+/** Error del compilador; sus posiciones son 0-based. */
+interface RawCompileError {
+  diagnostic: string
+  nodeOrToken?: { startPos?: RawPos }
 }
-interface RawDiag {
-  message: string
-  location?: { start?: RawPos }
+
+/** Una columna tal como queda en la tabla: propia o inyectada desde un `TablePartial`. */
+interface ResolvedField {
+  field: RawField
+  injected: boolean
+}
+
+/** Expande las referencias `~parcial` de una tabla en su posición (las columnas propias mandan). */
+function resolveFields(table: RawTable, partials: ReadonlyMap<string, RawPartial>): ResolvedField[] {
+  const refs = table.partials ?? []
+  if (refs.length === 0) return table.fields.map((field) => ({ field, injected: false }))
+  const own = new Set(table.fields.map((f) => f.name))
+  const byOrder = new Map(refs.map((r) => [r.order, r.name]))
+  const out: ResolvedField[] = []
+  const seen = new Set<string>()
+  let next = 0
+  for (let pos = 0; pos < table.fields.length + refs.length; pos++) {
+    const partialName = byOrder.get(pos)
+    if (partialName === undefined) {
+      const field = table.fields[next++]
+      if (field) out.push({ field, injected: false })
+      continue
+    }
+    for (const field of partials.get(partialName)?.fields ?? []) {
+      if (own.has(field.name) || seen.has(field.name)) continue
+      seen.add(field.name)
+      out.push({ field, injected: true })
+    }
+  }
+  while (next < table.fields.length) out.push({ field: table.fields[next++], injected: false })
+  return out
 }
 
 /* ------------------------------------------------------------------ */
@@ -213,20 +257,31 @@ export function buildProjectModel(
 
   let raw: RawDatabase
   try {
-    raw = new Parser().parse(merged.text, 'dbmlv2') as unknown as RawDatabase
-  } catch (err) {
-    const diags = (err as { diags?: RawDiag[] }).diags
-    if (Array.isArray(diags) && diags.length > 0) {
-      const errors = diags.map((d) =>
-        diagFromLine(chunks, d.location?.start?.line, translateParserMessage(d.message), { code: 'parse' }, d.location?.start?.column),
-      )
+    const layout = new MemoryProjectLayout()
+    layout.setSource(DEFAULT_ENTRY, merged.text)
+    const compiler = new Compiler(layout)
+    const compileErrors = compiler.parse.errors(DEFAULT_ENTRY) as unknown as RawCompileError[]
+    if (compileErrors.length > 0) {
+      const errors = compileErrors.map((e) => {
+        const pos = e.nodeOrToken?.startPos
+        return diagFromLine(
+          chunks,
+          pos ? pos.line + 1 : undefined,
+          translateParserMessage(e.diagnostic),
+          { code: 'parse' },
+          pos ? pos.column + 1 : undefined,
+        )
+      })
       return { model: null, errors: dedupeDiagnostics(errors) }
     }
+    raw = compiler.parse.rawDb(DEFAULT_ENTRY) as unknown as RawDatabase
+  } catch (err) {
     return {
       model: null,
       errors: [{ severity: 'error', code: 'parse', message: err instanceof Error ? err.message : 'Error de parseo' }],
     }
   }
+  const partials = new Map((raw.tablePartials ?? []).map((p) => [p.name, p]))
 
   const errors: Diagnostic[] = []
   const displaySchema = (schema: string | null | undefined) =>
@@ -235,169 +290,161 @@ export function buildProjectModel(
   // Enums
   const enums: EnumModel[] = []
   const enumKeys = new Set<string>()
-  for (const schema of raw.schemas) {
-    for (const e of schema.enums) {
-      const where = locate(chunks, e.token.start.line)
-      const s = displaySchema(schema.name)
-      const key = `${s}.${e.name}`
-      enumKeys.add(key)
-      enums.push({
-        key,
-        schema: s,
-        name: e.name,
-        values: e.values.map((v) => ({ name: v.name, ...(v.note ? { note: v.note } : {}) })),
-        stepId: where?.chunk.stepId ?? '',
-      })
-    }
+  for (const e of raw.enums) {
+    const where = locate(chunks, e.token.start.line)
+    const s = displaySchema(e.schemaName)
+    const key = `${s}.${e.name}`
+    enumKeys.add(key)
+    enums.push({
+      key,
+      schema: s,
+      name: e.name,
+      values: e.values.map((v) => ({ name: v.name, ...(v.note?.value ? { note: v.note.value } : {}) })),
+      stepId: where?.chunk.stepId ?? '',
+    })
   }
 
   // Tablas
   const tables: TableModel[] = []
   const seenKeys = new Map<string, TableModel>()
-  for (const schema of raw.schemas) {
-    for (const t of schema.tables) {
-      const startLine = t.token.start.line
-      const where = locate(chunks, startLine)
-      if (!where) continue
-      const s = displaySchema(schema.name)
-      const key = `${s}.${t.name}`
-      const isMongo = schema.name === 'mongo'
-      const kind = where.chunk.kind
-      const stepId = where.chunk.stepId
-      const loc: SourceLoc = {
-        stepId,
-        kind,
-        startLine: where.line,
-        endLine: where.line + (t.token.end.line - startLine),
-      }
-
-      if (kind === 'mongo' && !isMongo) {
-        errors.push(
-          diagFromLine(chunks, startLine, `La tabla '${key}' está en el archivo mongo pero no en el schema 'mongo' (usa Table mongo.${t.name})`, {
-            code: 'store',
-            table: key,
-          }),
-        )
-      }
-      if (kind === 'model' && isMongo) {
-        errors.push(
-          diagFromLine(chunks, startLine, `La colección '${key}' debe definirse en el archivo mongo del step, no en el archivo model`, {
-            code: 'store',
-            table: key,
-          }),
-        )
-      }
-      const previous = seenKeys.get(key)
-      if (previous) {
-        errors.push(diagFromLine(chunks, startLine, `La tabla '${key}' ya existe`, { code: 'duplicate', table: key }))
-      }
-
-      const columns: ColumnModel[] = []
-      for (const f of t.fields) {
-        const typeName = f.type.schemaName ? `${f.type.schemaName}.${f.type.type_name}` : f.type.type_name
-        const enumKey = `${displaySchema(f.type.schemaName)}.${f.type.type_name}`
-        const fieldLine = f.injectedPartial || !f.token ? startLine : f.token.start.line
-        let colStep = stepId
-        const stepProp = f.metadata?.step
-        if (stepProp !== undefined && stepProp !== null) {
-          const target = slugToStep.get(String(stepProp))
-          if (target) colStep = target
-          else
-            errors.push(
-              diagFromLine(chunks, fieldLine, `Step '${String(stepProp)}' desconocido en la columna '${key}.${f.name}'`, {
-                code: 'unknown-step',
-                table: key,
-              }),
-            )
-        }
-        if (isMongo && !parseMongoType(f.type.type_name)) {
-          errors.push(
-            diagFromLine(
-              chunks,
-              fieldLine,
-              `Tipo Mongo no permitido '${f.type.type_name}' en '${key}.${f.name}'. Usa: ${MONGO_BASE_TYPES.join(', ')}, "array<tipo>" o tipo[]`,
-              { code: 'mongo-type', table: key },
-            ),
-          )
-        }
-        const localLine = locate(chunks, fieldLine)?.line ?? where.line
-        columns.push({
-          name: f.name,
-          type: typeName,
-          pk: Boolean(f.pk),
-          notNull: Boolean(f.not_null) || Boolean(f.pk),
-          unique: Boolean(f.unique),
-          increment: Boolean(f.increment),
-          ...(toDefault(f.dbdefault) ? { default: toDefault(f.dbdefault) } : {}),
-          ...(f.note ? { note: f.note } : {}),
-          stepId: colStep,
-          ...(enumKeys.has(enumKey) && !isMongo ? { enumRef: enumKey } : {}),
-          line: localLine,
-        })
-      }
-
-      const indexes: IndexModel[] = t.indexes.map((i) => ({
-        ...(i.name ? { name: i.name } : {}),
-        columns: i.columns.map((c) => (c.type === 'expression' ? `\`${c.value}\`` : c.value)),
-        unique: Boolean(i.unique),
-        pk: Boolean(i.pk),
-        ...(i.type ? { type: i.type } : {}),
-      }))
-
-      const table: TableModel = {
-        key,
-        schema: s,
-        name: t.name,
-        store: isMongo ? 'mongo' : 'sqlserver',
-        stepId,
-        ...(t.note ? { note: t.note } : {}),
-        ...(t.headerColor ? { headerColor: t.headerColor } : {}),
-        columns,
-        indexes,
-        loc,
-      }
-      seenKeys.set(key, table)
-      tables.push(table)
+  for (const t of raw.tables) {
+    const startLine = t.token.start.line
+    const where = locate(chunks, startLine)
+    if (!where) continue
+    const s = displaySchema(t.schemaName)
+    const key = `${s}.${t.name}`
+    const isMongo = t.schemaName === 'mongo'
+    const kind = where.chunk.kind
+    const stepId = where.chunk.stepId
+    const loc: SourceLoc = {
+      stepId,
+      kind,
+      startLine: where.line,
+      endLine: where.line + (t.token.end.line - startLine),
     }
+
+    if (kind === 'mongo' && !isMongo) {
+      errors.push(
+        diagFromLine(chunks, startLine, `La tabla '${key}' está en el archivo mongo pero no en el schema 'mongo' (usa Table mongo.${t.name})`, {
+          code: 'store',
+          table: key,
+        }),
+      )
+    }
+    if (kind === 'model' && isMongo) {
+      errors.push(
+        diagFromLine(chunks, startLine, `La colección '${key}' debe definirse en el archivo mongo del step, no en el archivo model`, {
+          code: 'store',
+          table: key,
+        }),
+      )
+    }
+    const previous = seenKeys.get(key)
+    if (previous) {
+      errors.push(diagFromLine(chunks, startLine, `La tabla '${key}' ya existe`, { code: 'duplicate', table: key }))
+    }
+
+    const columns: ColumnModel[] = []
+    for (const { field: f, injected } of resolveFields(t, partials)) {
+      const typeName = f.type.schemaName ? `${f.type.schemaName}.${f.type.type_name}` : f.type.type_name
+      const enumKey = `${displaySchema(f.type.schemaName)}.${f.type.type_name}`
+      const fieldLine = injected || !f.token ? startLine : f.token.start.line
+      let colStep = stepId
+      const stepProp = f.metadata?.step
+      if (stepProp !== undefined && stepProp !== null) {
+        const target = slugToStep.get(String(stepProp))
+        if (target) colStep = target
+        else
+          errors.push(
+            diagFromLine(chunks, fieldLine, `Step '${String(stepProp)}' desconocido en la columna '${key}.${f.name}'`, {
+              code: 'unknown-step',
+              table: key,
+            }),
+          )
+      }
+      if (isMongo && !parseMongoType(f.type.type_name)) {
+        errors.push(
+          diagFromLine(
+            chunks,
+            fieldLine,
+            `Tipo Mongo no permitido '${f.type.type_name}' en '${key}.${f.name}'. Usa: ${MONGO_BASE_TYPES.join(', ')}, "array<tipo>" o tipo[]`,
+            { code: 'mongo-type', table: key },
+          ),
+        )
+      }
+      const localLine = locate(chunks, fieldLine)?.line ?? where.line
+      columns.push({
+        name: f.name,
+        type: typeName,
+        pk: Boolean(f.pk),
+        notNull: Boolean(f.not_null) || Boolean(f.pk),
+        unique: Boolean(f.unique),
+        increment: Boolean(f.increment),
+        ...(toDefault(f.dbdefault) ? { default: toDefault(f.dbdefault) } : {}),
+        ...(f.note?.value ? { note: f.note.value } : {}),
+        stepId: colStep,
+        ...(enumKeys.has(enumKey) && !isMongo ? { enumRef: enumKey } : {}),
+        line: localLine,
+      })
+    }
+
+    const partialIndexes = (t.partials ?? []).flatMap((ref) => partials.get(ref.name)?.indexes ?? [])
+    const indexes: IndexModel[] = [...t.indexes, ...partialIndexes].map((i) => ({
+      ...(i.name ? { name: i.name } : {}),
+      columns: i.columns.map((c) => (c.type === 'expression' ? `\`${c.value}\`` : c.value)),
+      unique: Boolean(i.unique),
+      pk: Boolean(i.pk),
+      ...(i.type ? { type: i.type } : {}),
+    }))
+
+    const table: TableModel = {
+      key,
+      schema: s,
+      name: t.name,
+      store: isMongo ? 'mongo' : 'sqlserver',
+      stepId,
+      ...(t.note?.value ? { note: t.note.value } : {}),
+      ...(t.headerColor ? { headerColor: t.headerColor } : {}),
+      columns,
+      indexes,
+      loc,
+    }
+    seenKeys.set(key, table)
+    tables.push(table)
   }
 
   // Relaciones
   const tableByRawKey = new Map<string, TableModel>()
   for (const t of tables) tableByRawKey.set(t.key, t)
   const relations: RelationModel[] = []
-  const seenRefs = new Set<number>()
   const seenRelIds = new Set<string>()
-  for (const schema of raw.schemas) {
-    for (const r of schema.refs) {
-      if (seenRefs.has(r.id)) continue
-      seenRefs.add(r.id)
-      if (r.endpoints.length !== 2) continue
-      let [a, b] = r.endpoints
-      // Normaliza: el lado "muchos" queda como `from`.
-      if (a.relation === '1' && b.relation === '*') [a, b] = [b, a]
-      const fromKey = `${displaySchema(a.schemaName)}.${a.tableName}`
-      const toKey = `${displaySchema(b.schemaName)}.${b.tableName}`
-      const fromTable = tableByRawKey.get(fromKey)
-      const toTable = tableByRawKey.get(toKey)
-      const op: RelationModel['op'] =
-        a.relation === '*' && b.relation === '1' ? '>' : a.relation === '1' && b.relation === '1' ? '-' : a.relation === '*' ? '<>' : '<'
-      const logical = fromTable?.store === 'mongo' || toTable?.store === 'mongo'
-      let id = `${fromKey}(${a.fieldNames.join(',')})${op}${toKey}(${b.fieldNames.join(',')})`
-      if (seenRelIds.has(id)) id = `${id}#${r.id}`
-      seenRelIds.add(id)
-      const where = locate(chunks, r.token.start.line)
-      relations.push({
-        id,
-        ...(r.name ? { name: r.name } : {}),
-        kind: logical ? 'logical' : 'fk',
-        from: { table: fromKey, columns: a.fieldNames, cardinality: a.relation === '*' ? 'N' : '1' },
-        to: { table: toKey, columns: b.fieldNames, cardinality: b.relation === '*' ? 'N' : '1' },
-        op,
-        ...(r.onDelete ? { onDelete: r.onDelete } : {}),
-        ...(r.onUpdate ? { onUpdate: r.onUpdate } : {}),
-        stepId: where?.chunk.stepId ?? fromTable?.stepId ?? '',
-      })
-    }
+  for (const [index, r] of raw.refs.entries()) {
+    if (r.endpoints.length !== 2) continue
+    let [a, b] = r.endpoints
+    // Normaliza: el lado "muchos" queda como `from`.
+    if (a.relation === '1' && b.relation === '*') [a, b] = [b, a]
+    const fromKey = `${displaySchema(a.schemaName)}.${a.tableName}`
+    const toKey = `${displaySchema(b.schemaName)}.${b.tableName}`
+    const fromTable = tableByRawKey.get(fromKey)
+    const toTable = tableByRawKey.get(toKey)
+    const op: RelationModel['op'] =
+      a.relation === '*' && b.relation === '1' ? '>' : a.relation === '1' && b.relation === '1' ? '-' : a.relation === '*' ? '<>' : '<'
+    const logical = fromTable?.store === 'mongo' || toTable?.store === 'mongo'
+    let id = `${fromKey}(${a.fieldNames.join(',')})${op}${toKey}(${b.fieldNames.join(',')})`
+    if (seenRelIds.has(id)) id = `${id}#${index}`
+    seenRelIds.add(id)
+    const where = locate(chunks, r.token.start.line)
+    relations.push({
+      id,
+      ...(r.name ? { name: r.name } : {}),
+      kind: logical ? 'logical' : 'fk',
+      from: { table: fromKey, columns: a.fieldNames, cardinality: a.relation === '*' ? 'N' : '1' },
+      to: { table: toKey, columns: b.fieldNames, cardinality: b.relation === '*' ? 'N' : '1' },
+      op,
+      ...(r.onDelete ? { onDelete: r.onDelete } : {}),
+      ...(r.onUpdate ? { onUpdate: r.onUpdate } : {}),
+      stepId: where?.chunk.stepId ?? fromTable?.stepId ?? '',
+    })
   }
 
   // Orden de definición: step, archivo (model antes que mongo) y línea.

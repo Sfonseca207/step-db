@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { serveStatic } from '@hono/node-server/serve-static'
 import { createNodeWebSocket } from '@hono/node-ws'
 import { bodyLimit } from 'hono/body-limit'
+import { compress } from 'hono/compress'
 import { csrf } from 'hono/csrf'
 import { auth, trustedOrigins } from './auth/better-auth.ts'
 import { pingDb } from './db/client.ts'
@@ -71,8 +72,19 @@ export function createApp() {
 
   mountWebSocket(app, upgradeWebSocket)
 
-  // UI compilada (npm run build) con fallback SPA.
+  // UI compilada (npm run build) con fallback SPA, comprimida. Los assets llevan hash en el
+  // nombre, así que el navegador puede guardarlos indefinidamente.
+  app.use('/assets/*', async (c, next) => {
+    await next()
+    if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable')
+  })
+  app.use('/*', compress())
   app.use('/*', serveStatic({ root: './dist' }))
+  // El HTML siempre se revalida: es el que apunta a los assets de cada versión.
+  app.get('*', async (c, next) => {
+    await next()
+    if (c.res.ok && c.res.headers.get('content-type')?.includes('text/html')) c.header('Cache-Control', 'no-cache')
+  })
   app.get('*', serveStatic({ path: './dist/index.html' }))
 
   return { app, injectWebSocket }

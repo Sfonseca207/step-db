@@ -270,18 +270,24 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
       onPersistPositions(placed)
       setTimeout(() => canvasActions.fitView(), 520)
     }
-    canvasActions.fitView = (keys?: string[]) => {
+    canvasActions.fitView = (keys?: string[], reserve = false) => {
+      const focused = keys !== undefined && keys.length > 0
       void fitView({
         // Con render parcial (muchos nodos) los no medidos cuentan con su tamaño estimado.
         includeHiddenNodes: true,
-        nodes: keys && keys.length > 0 ? keys.map((id) => ({ id })) : undefined,
-        padding: keys && keys.length > 0 ? 0.35 : 0.15,
+        nodes: focused ? keys.map((id) => ({ id })) : undefined,
+        padding: reserve
+          ? { top: '110px', bottom: '90px', x: '48px' }
+          : // Abajo a la derecha está el minimapa: se deja un margen para no tapar tablas.
+            focused
+            ? 0.35
+            : { top: '32px', left: '32px', right: '32px', bottom: roomy ? '56px' : '32px' },
         duration: prefersReducedMotion() ? 0 : 500,
         maxZoom: 1,
       })
     }
     canvasActions.positions = () => ({ ...positionsRef.current })
-  }, [model, steps, sizesOf, aspectOf, animateTo, onPersistPositions, fitView])
+  }, [model, steps, sizesOf, aspectOf, animateTo, onPersistPositions, fitView, roomy])
 
   // Centrar: espera a que las tablas pedidas existan y estén medidas (p. ej. recién creadas por MCP).
   const pendingCenter = useRef<{ tables: string[]; token: number; since: number } | null>(null)

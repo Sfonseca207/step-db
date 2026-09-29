@@ -94,3 +94,12 @@ describe('auth y seguridad', () => {
     expect(await res.json()).toEqual({ status: 'ok', db: 'ok' })
   })
 })
+
+describe('cabeceras', () => {
+  it('las respuestas llevan cabeceras de seguridad y la API no se cachea como asset', async () => {
+    const res = await request('GET', '/health')
+    expect(res.headers.get('content-security-policy')).toMatch(/default-src 'self'/)
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(res.headers.get('cache-control')).toBeNull()
+  })
+})

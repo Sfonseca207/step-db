@@ -1,6 +1,8 @@
 # Resumen de la sesión nocturna — MVP de StepDB
 
 > Fecha: 2026-09-28 · Rama: `development` · Todo en local (sin push, sin Railway).
+> **Actualización 2026-09-29:** después de esta sesión se hizo un QA intensivo que corrigió más de 30 defectos; ver [`QA.md`](QA.md). Las cifras de tests y algunas capturas de este documento corresponden al estado anterior.
+>
 > Estado final: **fases 0 a 8 implementadas**, `npm run build`, `npm run lint` y `npm test` en verde (8 archivos, **62 tests**).
 
 ## 1. Qué quedó hecho

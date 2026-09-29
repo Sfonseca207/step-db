@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Modal } from '../components/ConfirmDialog.tsx'
 import type { ProjectDto } from '../core/api.ts'
-import { ddlToDbml } from '../core/import.ts'
 import { translateParserMessage } from '../core/messages.ts'
 import { setDraftContent } from './drafts.ts'
 import { fileKey, useEditorStore } from './store.ts'
@@ -14,13 +13,18 @@ export function ImportDialog({ project, onClose }: { project: ProjectDto; onClos
   const [text, setText] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  function doImport() {
+  const [busy, setBusy] = useState(false)
+
+  async function doImport() {
     setError(null)
     const step = project.steps.find((s) => s.id === stepId)
     if (!step || !text.trim()) return
     let dbml = text.trim()
     if (mode === 'ddl') {
       try {
+        // El importador de SQL Server pesa varios MB: se descarga solo cuando se usa.
+        setBusy(true)
+        const { ddlToDbml } = await import('../core/import.ts')
         dbml = ddlToDbml(text)
       } catch (e) {
         const diags = (e as { diags?: { message: string; location?: { start?: { line: number } } }[] }).diags
@@ -30,6 +34,8 @@ export function ImportDialog({ project, onClose }: { project: ProjectDto; onClos
             : 'No se pudo convertir el DDL',
         )
         return
+      } finally {
+        setBusy(false)
       }
     }
     const current = useEditorStore.getState().drafts[fileKey(step.id, 'model')] ?? step.files.model.content
@@ -71,7 +77,7 @@ export function ImportDialog({ project, onClose }: { project: ProjectDto; onClos
         </div>
       </div>
       <textarea
-        autoFocus
+        data-autofocus
         className="input mt-3 h-56 font-mono text-xs"
         placeholder={mode === 'dbml' ? 'Table ventas.venta {\n  id bigint [pk]\n}' : 'CREATE TABLE dbo.Ventas (\n  Id bigint IDENTITY(1,1) PRIMARY KEY\n);'}
         value={text}
@@ -83,8 +89,8 @@ export function ImportDialog({ project, onClose }: { project: ProjectDto; onClos
         <button className="btn" onClick={onClose}>
           Cancelar
         </button>
-        <button className="btn btn-primary" onClick={doImport} disabled={!text.trim()}>
-          Importar
+        <button className="btn btn-primary" onClick={() => void doImport()} disabled={!text.trim() || busy}>
+          {busy ? 'Convirtiendo…' : 'Importar'}
         </button>
       </div>
     </Modal>

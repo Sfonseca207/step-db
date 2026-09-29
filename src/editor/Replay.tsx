@@ -66,7 +66,7 @@ export function ReplayOverlay({ workDates }: { workDates: Record<string, string>
     }
     useEditorStore.getState().applyDiff(diff)
     const focus = [...own, ...addedCols.map((c) => c.split('.').slice(0, 2).join('.'))]
-    setTimeout(() => canvasActions.fitView(focus.length ? focus : [...tables]), 80)
+    setTimeout(() => canvasActions.fitView(focus.length ? focus : [...tables], true), 80)
   }, [replay, model, ordered, setReplay])
 
   // Avance automático.

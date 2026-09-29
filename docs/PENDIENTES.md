@@ -20,10 +20,18 @@ Estado de los ítems P1/P2 de la fase 8 y de lo que quedó fuera del MVP. Las de
 
 - [ ] **Borrar un step** desde la UI o el MCP: la spec no define endpoint (solo crear, editar y reordenar).
 - [ ] **RF-82 completo**: la importación de DDL agrega las tablas al step elegido; no crea automáticamente un step `00-legado` al inicio de la línea de tiempo (se puede crear un step y reordenarlo).
-- [ ] **Recolor animado de relaciones** (RF-12): los encabezados y badges cambian de color con transición; los gradientes de las aristas cambian sin transición.
-- [ ] **Diff visual en el diálogo de conflicto**: muestra ambos contenidos lado a lado, sin resaltar las líneas distintas.
-- [ ] **Layout por step con muchas tablas sin relaciones internas**: ELK las acomoda en rejilla y los bloques se apilan en vertical; con 150 tablas el encuadre queda muy alejado (el rendimiento sí cumple RNF-01: ~100 fps en pan/zoom).
-- [ ] **Paneles laterales en pantallas pequeñas**: son redimensionables y colapsables, pero no hay layout específico para móvil.
+- [ ] **Ruteo de relaciones**: son curvas directas y pueden pasar por detrás de una tabla. Se mitiga dibujándolas por encima al pasar el cursor o al seleccionar la tabla; el ruteo ortogonal de ELK queda para después.
+- [ ] **Modelar desde el móvil**: debajo de 1024 px los paneles flotan sobre el canvas; sirve para consultar, no para escribir DBML con comodidad.
+- [ ] **El slug de un step conserva su número original al reordenar** (decisión I13): el selector de archivos puede mostrar `06-turnos` para el step que quedó en la posición 04.
 - [ ] **Depuración de revisiones antiguas** (backlog de la spec).
 - [ ] **Rate limiting por IP detrás del proxy de Railway**: Better Auth usa `x-forwarded-for`; conviene fijar `advanced.ipAddress` al desplegar.
 - [ ] **PGlite** (plan B sin Docker) no se implementó porque Docker estuvo disponible; `DB_DRIVER` solo acepta `postgres`.
+
+## Resuelto en el QA del 2026-09-29
+
+Detalle en `QA.md`.
+
+- [x] Recolor animado de relaciones (RF-12).
+- [x] Diff resaltado en el diálogo de conflicto.
+- [x] Layout por step según la proporción del canvas; encuadre correcto con muchas tablas.
+- [x] Paneles y barra adaptables a pantallas pequeñas.

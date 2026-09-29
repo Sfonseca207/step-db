@@ -54,7 +54,7 @@ export function StepDialog(props: {
             <input
               id="step-name"
               className="input"
-              autoFocus
+              data-autofocus
               required
               maxLength={120}
               value={values.name}

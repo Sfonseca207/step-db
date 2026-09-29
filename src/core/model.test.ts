@@ -136,6 +136,22 @@ describe('buildProjectModel', () => {
     expect(errors[0]).toMatchObject({ code: 'unknown-step', line: 3 })
   })
 
+  it('inyecta las columnas e índices de un TablePartial en su posición', () => {
+    const { model, errors } = buildProjectModel([
+      step(
+        'a',
+        1,
+        'TablePartial auditoria {\n  creado_en datetime2 [not null]\n  id int\n  indexes {\n    creado_en\n  }\n}\nTable ventas.x {\n  id bigint [pk]\n  ~auditoria\n  total int\n}',
+      ),
+    ])
+    expect(errors).toEqual([])
+    const x = model!.tables[0]
+    // La columna propia `id` manda sobre la del parcial.
+    expect(x.columns.map((c) => `${c.name}:${c.type}`)).toEqual(['id:bigint', 'creado_en:datetime2', 'total:int'])
+    expect(x.columns[1]).toMatchObject({ notNull: true, stepId: 'a', line: 8 })
+    expect(x.indexes).toEqual([{ columns: ['creado_en'], unique: false, pk: false }])
+  })
+
   it('un proyecto vacío produce un modelo vacío', () => {
     expect(buildProjectModel([step('a', 1, '')])).toEqual({ model: { tables: [], relations: [], enums: [] }, errors: [] })
   })

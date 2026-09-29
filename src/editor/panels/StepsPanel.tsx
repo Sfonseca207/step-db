@@ -163,7 +163,7 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                 <button
                   type="button"
                   aria-pressed={selected}
-                  className="block w-full rounded-xl p-2.5 text-left focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none"
+                  className="block w-full rounded-t-xl p-2.5 pb-2 text-left focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none"
                   onClick={() => {
                     selectStep(selected ? null : s.id)
                     if (!selected) {
@@ -211,18 +211,9 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                 )}
                 {s.description && <span className="mt-1 line-clamp-2 text-[11.5px] leading-snug text-slate-500">{s.description}</span>}
                 </button>
-                <div className="absolute top-1.5 right-1.5 hidden gap-0.5 rounded-lg bg-white/95 p-0.5 shadow-sm group-hover:flex group-focus-within:flex">
-                  {!active && (
-                    <button
-                      className="rounded px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
-                      onClick={() => setActive.mutate(s.id)}
-                      title="Las tablas nuevas y el MCP usarán este step"
-                    >
-                      Activar
-                    </button>
-                  )}
+                <div className="flex gap-3 border-t border-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-400">
                   <button
-                    className="rounded px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
+                    className="rounded transition-colors hover:text-slate-800 focus-visible:text-slate-800 focus-visible:outline-none"
                     onClick={() => {
                       setDialogError(null)
                       setDialog({ mode: 'edit', step: s })
@@ -230,6 +221,15 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                   >
                     Editar
                   </button>
+                  {!active && (
+                    <button
+                      className="rounded transition-colors hover:text-slate-800 focus-visible:text-slate-800 focus-visible:outline-none"
+                      onClick={() => setActive.mutate(s.id)}
+                      title="Las tablas nuevas y el MCP usarán este step"
+                    >
+                      Activar
+                    </button>
+                  )}
                 </div>
               </div>
             </li>

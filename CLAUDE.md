@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado del proyecto
 
-StepDB: aplicación web para modelar bases de datos por "steps" (etapas), estilo dbdiagram.io. Frontend React + backend Node/Hono en el mismo repo, Postgres como fuente de verdad, sincronización en vivo por WebSocket y servidor MCP (`/mcp`) para que agentes lean y escriban el modelo. **La especificación completa del MVP está en `docs/SPEC-MVP.md`: leerla antes de implementar.** Las decisiones tomadas durante la implementación se registran en `docs/DECISIONES.md` y lo no terminado en `docs/PENDIENTES.md`. El resumen de la implementación del MVP está en `docs/RESUMEN-NOCHE.md`.
+StepDB: aplicación web para modelar bases de datos por "steps" (etapas), estilo dbdiagram.io. Frontend React + backend Node/Hono en el mismo repo, Postgres como fuente de verdad, sincronización en vivo por WebSocket y servidor MCP (`/mcp`) para que agentes lean y escriban el modelo. **La especificación completa del MVP está en `docs/SPEC-MVP.md`: leerla antes de implementar.** Las decisiones tomadas durante la implementación se registran en `docs/DECISIONES.md` y lo no terminado en `docs/PENDIENTES.md`. El resumen de la implementación del MVP está en `docs/RESUMEN-NOCHE.md` y el informe del QA en `docs/QA.md`.
 
 El MVP (fases 0–8 de la spec) está implementado y probado en local; aún no se ha desplegado en Railway.
 
@@ -43,8 +43,8 @@ Requiere `.env` (ver `.env.example`). Los tests de integración usan `DATABASE_U
 ## Arquitectura
 
 - `src/core/` — lógica **isomórfica** (sin DOM ni Node), la importan UI y servidor:
-  - `model.ts`: concatena los archivos `model`/`mongo` de los steps con un mapa de offsets, parsea con `@dbml/core` y normaliza a `ProjectModel` (tablas con `stepId`/`store`/ubicación, columnas con `stepId` vía `[step: "slug"]`, relaciones `fk`/`logical`). Nunca lanza: los errores vuelven como `Diagnostic` con `step · archivo:línea`.
-  - `diff.ts` (diff semántico y resumen), `lint.ts` (advertencias RF-70), `export/` (T-SQL, mongosh, DBML combinado), `import.ts` (DDL → DBML), `api.ts` (DTOs y eventos WS compartidos), `schemas.ts` (zod de convenciones y layout).
+  - `model.ts`: concatena los archivos `model`/`mongo` de los steps con un mapa de offsets, parsea con `@dbml/parse` (no con `@dbml/core`, que pesa ~21 MB y solo se usa, bajo demanda, para importar DDL) y normaliza a `ProjectModel` (tablas con `stepId`/`store`/ubicación, columnas con `stepId` vía `[step: "slug"]`, relaciones `fk`/`logical`). Nunca lanza: los errores vuelven como `Diagnostic` con `step · archivo:línea`.
+  - `diff.ts` (diff semántico y resumen), `lint.ts` (advertencias RF-70), `export/` (T-SQL, mongosh, DBML combinado), `import.ts` (DDL → DBML), `messages.ts` (errores del parser en español), `linediff.ts` (diff por líneas del diálogo de conflicto), `api.ts` (DTOs y eventos WS compartidos), `schemas.ts` (zod de convenciones y layout).
 - `server/` — Hono sobre Node con **type stripping** (sin compilar; imports con extensión `.ts`):
   - `app.ts` compone middlewares y rutas; `index.ts` arranca e inyecta el WebSocket (`@hono/node-ws`).
   - `modules/*/service.ts` contiene la lógica y los permisos; `routes.ts` y las tools MCP (`mcp/server.ts`) son delgadas y llaman a los mismos services. Todo acceso a un proyecto pasa por `assertProjectAccess` (ajeno → 404).
@@ -59,3 +59,5 @@ Requiere `.env` (ver `.env.example`). Los tests de integración usan `DATABASE_U
 - Opciones de TS relevantes: `verbatimModuleSyntax` (imports de tipos con `import type`), `erasableSyntaxOnly` (sin `enum`, `namespace` ni parameter properties: Node debe poder quitar los tipos), `allowImportingTsExtensions` (imports locales con `.ts`/`.tsx`), `noUnusedLocals`/`noUnusedParameters`.
 - ESLint aplica `react-hooks` (incluida `set-state-in-effect`) y `react-refresh` (los módulos de componentes solo exportan componentes: helpers y constantes van en archivos aparte).
 - En desarrollo se expone `window.__stepdb` (store y `setDraftContent`) para QA con Playwright; no existe en el build.
+- Al probar el editor con Playwright hay que **teclear** (`keyboard.type`), no pegar texto: así se detectó que React Flow capturaba Espacio y Backspace. Todo lo que contenga un editor Monaco va dentro de un elemento con clase `nokey`.
+- El atenuado de nodos va en el contenedor `.sdb-node`, no en el elemento que anima Motion (que escribe `opacity` en línea).
