@@ -19,3 +19,6 @@ export async function pingDb(): Promise<boolean> {
     return false
   }
 }
+
+/** Transacción de Drizzle (o la propia instancia) para funciones que aceptan ambas. */
+export type Tx = Parameters<Parameters<Db['transaction']>[0]>[0] | Db
