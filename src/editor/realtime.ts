@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router'
 import type { ProjectDto, RealtimeEvent } from '../core/api.ts'
 import { columnTable } from '../core/diff.ts'
 import { CLIENT_ID } from '../lib/api.ts'
-import { projectQueryKey } from './hooks.ts'
+import { activityQueryKey, projectQueryKey } from './hooks.ts'
 import { useEditorStore } from './store.ts'
 
 const SOURCE_LABEL: Record<string, string> = { mcp: 'Claude', ui: 'Otra pestaña', api: 'API', seed: 'Ejemplo' }
@@ -27,6 +27,7 @@ export function useRealtime(projectId: string) {
       const store = useEditorStore.getState()
       switch (ev.type) {
         case 'model.changed': {
+          void qc.invalidateQueries({ queryKey: activityQueryKey(projectId) })
           if (ev.clientId === CLIENT_ID) return
           await qc.refetchQueries({ queryKey: key })
           const project = qc.getQueryData<ProjectDto>(key)

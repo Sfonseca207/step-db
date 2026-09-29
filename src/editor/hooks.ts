@@ -12,6 +12,7 @@ import type { Point } from './canvas/graph.ts'
 import { fileKey, useEditorStore } from './store.ts'
 
 export const projectQueryKey = (id: string) => ['project', id] as const
+export const activityQueryKey = (projectId: string) => ['activity', projectId] as const
 
 export function useProject(projectId: string) {
   return useQuery({

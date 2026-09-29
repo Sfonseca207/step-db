@@ -51,6 +51,8 @@ function TableNodeComponent({ id, data }: NodeProps<TableNodeType>) {
   const selected = useEditorStore((s) => s.selectedTable === id)
   const hoverCols = useEditorStore((s) => s.hoverColumns[id] ?? EMPTY)
   const flashColumns = useEditorStore((s) => s.highlights.flashColumns)
+  const replayMaxPos = useEditorStore((s) => s.replayMaxPos)
+  const stepPos = useEditorStore((s) => s.steps)
 
   // Los handles dependen de las relaciones: si cambian, React Flow debe volver a medirlos.
   const updateNodeInternals = useUpdateNodeInternals()
@@ -108,6 +110,8 @@ function TableNodeComponent({ id, data }: NodeProps<TableNodeType>) {
       <div className="sdb-table-body">
         {rows.map((row) => {
           const col = colByName.get(row.name)
+          // Replay: oculta columnas agregadas en steps posteriores al visible.
+          if (replayMaxPos !== null && col && (stepPos[col.stepId]?.position ?? 0) > replayMaxPos) return null
           const other = columnStepColors[row.name]
           const flash = flashColumns[`${id}.${row.name}`]
           const hovered = hoverCols.includes(row.name)

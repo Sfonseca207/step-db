@@ -69,6 +69,11 @@ interface EditorState {
   replay: { active: boolean; stepIndex: number; playing: boolean; speed: number } | null
   /** Tablas visibles durante el replay (null = todas). */
   replayVisible: Set<string> | null
+  /** Relaciones visibles durante el replay. */
+  replayRelations: Set<string> | null
+  /** Posición máxima de step visible durante el replay (oculta columnas futuras). */
+  replayMaxPos: number | null
+  activityOpen: boolean
   highlights: Highlights
   toasts: Toast[]
   /** Petición de centrar el canvas (tabla o step). */
@@ -91,7 +96,11 @@ interface EditorState {
   setSearchOpen(open: boolean): void
   setSideTab(tab: SidePanelTab): void
   toggleHulls(): void
-  setReplay(replay: EditorState['replay'], visible?: Set<string> | null): void
+  setReplay(
+    replay: EditorState['replay'],
+    visible?: { tables: Set<string>; relations: Set<string>; maxPos: number } | null,
+  ): void
+  toggleActivity(): void
   applyDiff(diff: ModelDiff): void
   pushToast(toast: Omit<Toast, 'id'>): void
   dismissToast(id: number): void
@@ -154,6 +163,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   showHulls: false,
   replay: null,
   replayVisible: null,
+  replayRelations: null,
+  replayMaxPos: null,
+  activityOpen: false,
   highlights: emptyHighlights(),
   toasts: [],
   centerRequest: null,
@@ -179,6 +191,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       hoverColumns: {},
       replay: null,
       replayVisible: null,
+      replayRelations: null,
+      replayMaxPos: null,
       highlights: emptyHighlights(),
       toasts: [],
       centerRequest: null,
@@ -247,7 +261,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ showHulls: !get().showHulls })
   },
   setReplay(replay, visible = null) {
-    set({ replay, replayVisible: replay ? visible : null })
+    set({
+      replay,
+      replayVisible: replay && visible ? visible.tables : null,
+      replayRelations: replay && visible ? visible.relations : null,
+      replayMaxPos: replay && visible ? visible.maxPos : null,
+    })
+  },
+  toggleActivity() {
+    set({ activityOpen: !get().activityOpen })
   },
   applyDiff(diff) {
     const h = get().highlights

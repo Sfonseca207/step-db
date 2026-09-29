@@ -151,26 +151,25 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                 title={active ? 'Step activo' : undefined}
               />
               <div
-                role="button"
-                tabIndex={0}
-                aria-pressed={selected}
-                onClick={() => {
-                  selectStep(selected ? null : s.id)
-                  if (!selected) {
-                    const tables = model?.tables.filter((t) => t.stepId === s.id).map((t) => t.key) ?? []
-                    if (tables.length) requestCenter(tables)
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') selectStep(selected ? null : s.id)
-                }}
-                className={`group relative cursor-pointer rounded-xl border bg-white p-2.5 transition hover:shadow-sm ${
+                className={`group relative rounded-xl border bg-white transition hover:shadow-sm ${
                   dragId === s.id ? 'opacity-40' : ''
                 } ${selected ? 'shadow-sm' : 'border-slate-200'}`}
                 style={selected ? { borderColor: s.color, boxShadow: `0 0 0 1px ${s.color}` } : undefined}
               >
                 {celebrate?.stepId === s.id && <Celebration key={celebrate.token} color={s.color} />}
-                <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  aria-pressed={selected}
+                  className="block w-full rounded-xl p-2.5 text-left focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:outline-none"
+                  onClick={() => {
+                    selectStep(selected ? null : s.id)
+                    if (!selected) {
+                      const tables = model?.tables.filter((t) => t.stepId === s.id).map((t) => t.key) ?? []
+                      if (tables.length) requestCenter(tables)
+                    }
+                  }}
+                >
+                <span className="flex items-center gap-2">
                   <span
                     className="rounded-md px-1.5 py-px text-[10.5px] font-bold text-white tabular-nums"
                     style={{ background: s.color }}
@@ -187,33 +186,31 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                   >
                     {s.status === 'completado' ? '✓' : '◉'}
                   </span>
-                </div>
-                <div className="mt-1 flex items-center gap-2 text-[11px] whitespace-nowrap text-slate-500">
+                </span>
+                <span className="mt-1 flex items-center gap-2 text-[11px] whitespace-nowrap text-slate-500">
                   <span>{shortDate(s.workDate)}</span>
                   <span className="text-slate-300">·</span>
                   <span>
                     {st?.tables ?? 0} {st?.tables === 1 ? 'tabla' : 'tablas'}
                     {st && st.collections > 0 ? ` · ${st.collections} ${st.collections === 1 ? 'colección' : 'colecciones'}` : ''}
                   </span>
-                </div>
+                </span>
                 {st && st.foreign.length > 0 && (
-                  <p
-                    className="mt-1 flex items-center gap-1 text-[11px] text-slate-500"
+                  <span
+                    className="block mt-1 flex items-center gap-1 text-[11px] text-slate-500"
                     title={st.foreign.map((f) => `${f.table}.${f.column}`).join('\n')}
                   >
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: s.color }} />+{st.foreign.length}{' '}
                     {st.foreign.length === 1 ? 'columna' : 'columnas'} en tablas de otros steps
-                  </p>
+                  </span>
                 )}
-                {s.description && <p className="mt-1 line-clamp-2 text-[11.5px] leading-snug text-slate-500">{s.description}</p>}
+                {s.description && <span className="block mt-1 line-clamp-2 text-[11.5px] leading-snug text-slate-500">{s.description}</span>}
+                </button>
                 <div className="absolute top-1.5 right-1.5 hidden gap-0.5 rounded-lg bg-white/95 p-0.5 shadow-sm group-hover:flex group-focus-within:flex">
                   {!active && (
                     <button
                       className="rounded px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setActive.mutate(s.id)
-                      }}
+                      onClick={() => setActive.mutate(s.id)}
                       title="Las tablas nuevas y el MCP usarán este step"
                     >
                       Activar
@@ -221,8 +218,7 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                   )}
                   <button
                     className="rounded px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-100"
-                    onClick={(e) => {
-                      e.stopPropagation()
+                    onClick={() => {
                       setDialogError(null)
                       setDialog({ mode: 'edit', step: s })
                     }}

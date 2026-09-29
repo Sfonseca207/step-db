@@ -1,6 +1,7 @@
 import Editor, { type OnMount } from '@monaco-editor/react'
 import { useEffect, useRef } from 'react'
 import type { Diagnostic } from '../../core/types.ts'
+import { useEditorStore } from '../store.ts'
 import { monaco } from './monaco.ts'
 
 interface Props {
@@ -19,6 +20,8 @@ export function CodeEditor({ path, value, language, readOnly, diagnostics, revea
 
   const onMount: OnMount = (editor) => {
     editorRef.current = editor
+    // Cmd/Ctrl+K abre la búsqueda de StepDB también con el foco en el editor.
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyK, () => useEditorStore.getState().setSearchOpen(true))
   }
 
   // Markers de error/advertencia en la línea correcta del archivo.

@@ -2,6 +2,7 @@ import {
   applyNodeChanges,
   Background,
   BackgroundVariant,
+  ControlButton,
   Controls,
   MiniMap,
   ReactFlow,
@@ -40,6 +41,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   const warnings = useEditorStore((s) => s.warnings)
   const removedTables = useEditorStore((s) => s.highlights.removedTables)
   const replayVisible = useEditorStore((s) => s.replayVisible)
+  const replayRelations = useEditorStore((s) => s.replayRelations)
   const showHulls = useEditorStore((s) => s.showHulls)
   const selectTable = useEditorStore((s) => s.selectTable)
   const hoverEdge = useEditorStore((s) => s.hoverEdge)
@@ -52,6 +54,8 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   const positionsRef = useRef<Record<string, Point>>({ ...layout.positions })
   const lastModelRef = useRef<ProjectModel | null>(null)
   const initialLayoutDone = useRef(false)
+  /** Encuadre pendiente (sin viewport guardado o tras el layout inicial). */
+  const pendingFit = useRef(!layout.viewport)
   const animRef = useRef<number | null>(null)
 
   // Posiciones que llegan del servidor (otra pestaña) para tablas que no se están arrastrando.
@@ -131,7 +135,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
         setNodes(buildNodes(model, steps, positionsRef.current, useEditorStore.getState().warnings))
         setGraphModel(model)
         onPersistPositions(placed)
-        requestAnimationFrame(() => fitView({ padding: 0.15, duration: 400 }))
+        pendingFit.current = true
       })
       return
     }
@@ -157,6 +161,16 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
     setGraphModel(model)
     lastModelRef.current = model
   }, [model, steps, warnings, removedTables, sizesOf, onPersistPositions, fitView])
+
+  // Encuadra cuando los nodos ya están en React Flow (usa el tamaño estimado de los no medidos).
+  useEffect(() => {
+    if (!pendingFit.current || nodes.length === 0) return
+    const raf = requestAnimationFrame(() => {
+      pendingFit.current = false
+      void fitView({ padding: 0.12, duration: prefersReducedMotion() ? 0 : 400, maxZoom: 1, includeHiddenNodes: true })
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [nodes, fitView])
 
   const onNodesChange = useCallback((changes: NodeChange<TableNodeT>[]) => {
     setNodes((prev) => applyNodeChanges(changes, prev))
@@ -201,9 +215,10 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   const visibleEdges = useMemo(
     () =>
       replayVisible
-        ? edges.map((e) => ({ ...e, hidden: !replayVisible.has(e.source) || !replayVisible.has(e.target) }))
+        ? // Se filtran (no solo se ocultan): el replay quita filas y sus handles.
+          edges.filter((e) => replayVisible.has(e.source) && replayVisible.has(e.target) && replayRelations?.has(e.id))
         : edges,
-    [edges, replayVisible],
+    [edges, replayVisible, replayRelations],
   )
 
   // Acciones expuestas a la barra de herramientas.
@@ -217,10 +232,12 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
       Object.assign(positionsRef.current, placed)
       animateTo(placed)
       onPersistPositions(placed)
-      setTimeout(() => fitView({ padding: 0.15, duration: 500 }), 520)
+      setTimeout(() => canvasActions.fitView(), 520)
     }
     canvasActions.fitView = (keys?: string[]) => {
       void fitView({
+        // Con render parcial (muchos nodos) los no medidos cuentan con su tamaño estimado.
+        includeHiddenNodes: true,
         nodes: keys && keys.length > 0 ? keys.map((id) => ({ id })) : undefined,
         padding: keys && keys.length > 0 ? 0.35 : 0.15,
         duration: prefersReducedMotion() ? 0 : 500,
@@ -279,8 +296,6 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
         elementsSelectable
         onlyRenderVisibleElements={nodes.length > 80}
         attributionPosition="top-right"
-        fitView={!layout.viewport}
-        fitViewOptions={{ padding: 0.15 }}
       >
         {showHulls && <StepHulls nodes={visibleNodes} />}
         <Background variant={BackgroundVariant.Dots} gap={18} size={1.4} color="#dbe2ea" bgColor="#ffffff" />
@@ -293,7 +308,13 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
           maskColor="rgba(248,250,252,0.7)"
           className="!rounded-xl !border !border-slate-200 !shadow-sm"
         />
-        <Controls showInteractive={false} className="!rounded-lg !border !border-slate-200 !shadow-sm" />
+        <Controls showInteractive={false} showFitView={false} className="!rounded-lg !border !border-slate-200 !shadow-sm">
+          <ControlButton onClick={() => canvasActions.fitView()} title="Encuadrar todo" aria-label="Encuadrar todo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+            </svg>
+          </ControlButton>
+        </Controls>
       </ReactFlow>
     </div>
   )

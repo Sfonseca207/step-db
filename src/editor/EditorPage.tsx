@@ -14,6 +14,9 @@ import { StepsPanel } from './panels/StepsPanel.tsx'
 import { useRealtime } from './realtime.ts'
 import { useEditorStore } from './store.ts'
 import { Toasts } from './Toasts.tsx'
+import { ActivityPanel } from './ActivityPanel.tsx'
+import { ReplayOverlay } from './Replay.tsx'
+import { SearchPalette } from './SearchPalette.tsx'
 import { Toolbar } from './Toolbar.tsx'
 import './editor.css'
 
@@ -131,6 +134,8 @@ export default function EditorPage() {
           <div className="relative min-w-0 flex-1">
             <Canvas layout={project.data.layout} onPersistPositions={persistPositions} onPersistViewport={persistViewport} />
             <ErrorBanner />
+            <ActivityPanel projectId={projectId} />
+            <ReplayOverlay workDates={Object.fromEntries(project.data.steps.map((s) => [s.id, s.workDate]))} />
             <Toasts />
           </div>
           {rightOpen && (
@@ -143,6 +148,7 @@ export default function EditorPage() {
           )}
         </div>
         <ConflictDialog onResolve={resolveConflict} />
+        <SearchPalette />
       </div>
     </ReactFlowProvider>
   )

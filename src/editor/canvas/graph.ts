@@ -120,10 +120,14 @@ export function buildNodes(
         columnStepColors[c.name] = { color: steps[c.stepId].color, slug: steps[c.stepId].slug }
       }
     }
+    const size = estimateSize(t)
     return {
       id: t.key,
       type: 'table',
       position: positions[t.key] ?? { x: 0, y: 0 },
+      // Tamaño estimado hasta que React Flow mida el nodo (fitView y render de solo lo visible).
+      initialWidth: size.width,
+      initialHeight: size.height,
       data: {
         table: t,
         color: step?.color ?? '#94A3B8',
