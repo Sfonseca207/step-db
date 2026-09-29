@@ -1,6 +1,6 @@
-import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { Handle, Position, useUpdateNodeInternals, type NodeProps } from '@xyflow/react'
 import { motion, useReducedMotion } from 'motion/react'
-import { memo } from 'react'
+import { memo, useEffect } from 'react'
 import { contrastText, tint } from '../../core/palette.ts'
 import { useEditorStore } from '../store.ts'
 import type { TableNode as TableNodeType } from './graph.ts'
@@ -51,6 +51,13 @@ function TableNodeComponent({ id, data }: NodeProps<TableNodeType>) {
   const selected = useEditorStore((s) => s.selectedTable === id)
   const hoverCols = useEditorStore((s) => s.hoverColumns[id] ?? EMPTY)
   const flashColumns = useEditorStore((s) => s.highlights.flashColumns)
+
+  // Los handles dependen de las relaciones: si cambian, React Flow debe volver a medirlos.
+  const updateNodeInternals = useUpdateNodeInternals()
+  const handlesKey = handleColumns.join('|')
+  useEffect(() => {
+    updateNodeInternals(id)
+  }, [id, handlesKey, rows.length, updateNodeInternals])
 
   const isMongo = table.store === 'mongo'
   const headerText = contrastText(color)

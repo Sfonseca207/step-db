@@ -72,6 +72,12 @@ export function useModelSync(project: ProjectDto | undefined) {
         }
         setModel(result.model, [])
         setWarnings(lintModel(result.model, project.conventions))
+      } else if (!prev) {
+        // Sin último modelo válido (p. ej. un borrador inválido recuperado al abrir):
+        // se muestra lo guardado en el servidor para que el canvas nunca quede vacío.
+        const saved = buildProjectModel(sourcesWithDrafts(project, {}), project.conventions)
+        setModel(saved.model, result.errors)
+        if (saved.model) setWarnings(lintModel(saved.model, project.conventions))
       } else {
         setModel(null, result.errors)
       }

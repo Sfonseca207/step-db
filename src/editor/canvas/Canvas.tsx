@@ -47,6 +47,8 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   const { fitView, getNodes } = useReactFlow()
 
   const [nodes, setNodes] = useState<TableNodeT[]>([])
+  /** Modelo con el que se construyeron los nodos: las aristas usan el mismo (handles coherentes). */
+  const [graphModel, setGraphModel] = useState<ProjectModel | null>(null)
   const positionsRef = useRef<Record<string, Point>>({ ...layout.positions })
   const lastModelRef = useRef<ProjectModel | null>(null)
   const initialLayoutDone = useRef(false)
@@ -127,6 +129,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
       void elkLayout(model, sizes, true, order).then((placed) => {
         Object.assign(positionsRef.current, placed)
         setNodes(buildNodes(model, steps, positionsRef.current, useEditorStore.getState().warnings))
+        setGraphModel(model)
         onPersistPositions(placed)
         requestAnimationFrame(() => fitView({ padding: 0.15, duration: 400 }))
       })
@@ -151,6 +154,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
       const ghosts = prev.filter((n) => !keys.has(n.id) && removedTables[n.id] !== undefined)
       return [...built, ...ghosts]
     })
+    setGraphModel(model)
     lastModelRef.current = model
   }, [model, steps, warnings, removedTables, sizesOf, onPersistPositions, fitView])
 
@@ -180,15 +184,15 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
     [nodes],
   )
   const edges = useMemo(() => {
-    if (!model) return []
+    if (!graphModel) return []
     const centers = new Map<string, { cx: number; left: number; right: number }>()
     for (const n of nodes) {
       const w = n.measured?.width ?? estimateSize(n.data.table).width
       centers.set(n.id, { cx: n.position.x + w / 2, left: n.position.x, right: n.position.x + w })
     }
-    return buildEdges(model, steps, centers)
+    return buildEdges(graphModel, steps, centers)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `sidesKey` resume las posiciones relevantes
-  }, [model, steps, sidesKey])
+  }, [graphModel, steps, sidesKey])
 
   const visibleNodes = useMemo(
     () => (replayVisible ? nodes.map((n) => ({ ...n, hidden: !replayVisible.has(n.id) })) : nodes),

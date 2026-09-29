@@ -49,6 +49,8 @@ interface EditorState {
   errors: Diagnostic[]
   warnings: Diagnostic[]
   drafts: Record<string, string>
+  /** Versión del servidor sobre la que se empezó cada borrador (control de concurrencia). */
+  draftBase: Record<string, number>
   saving: Record<string, 'idle' | 'saving' | 'error'>
   conflict: ConflictState | null
 
@@ -77,7 +79,8 @@ interface EditorState {
   setSteps(steps: StepMeta[]): void
   setModel(model: ProjectModel | null, errors: Diagnostic[]): void
   setWarnings(warnings: Diagnostic[]): void
-  setDraft(stepId: string, kind: FileKind, content: string | null): void
+  setDraft(stepId: string, kind: FileKind, content: string | null, baseVersion?: number): void
+  setDraftBase(key: string, version: number): void
   setSaving(key: string, state: 'idle' | 'saving' | 'error'): void
   setConflict(conflict: ConflictState | null): void
   selectStep(stepId: string | null): void
@@ -125,6 +128,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   errors: [],
   warnings: [],
   drafts: {},
+  draftBase: {},
   saving: {},
   conflict: null,
   selectedStepId: null,
@@ -152,6 +156,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       errors: [],
       warnings: [],
       drafts: {},
+      draftBase: {},
       saving: {},
       conflict: null,
       selectedStepId: null,
@@ -184,12 +189,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setWarnings(warnings) {
     set({ warnings })
   },
-  setDraft(stepId, kind, content) {
+  setDraft(stepId, kind, content, baseVersion) {
     const key = fileKey(stepId, kind)
     const drafts = { ...get().drafts }
-    if (content === null) delete drafts[key]
-    else drafts[key] = content
-    set({ drafts })
+    const draftBase = { ...get().draftBase }
+    if (content === null) {
+      delete drafts[key]
+      delete draftBase[key]
+    } else {
+      drafts[key] = content
+      if (draftBase[key] === undefined && baseVersion !== undefined) draftBase[key] = baseVersion
+    }
+    set({ drafts, draftBase })
+  },
+  setDraftBase(key, version) {
+    set({ draftBase: { ...get().draftBase, [key]: version } })
   },
   setSaving(key, state) {
     set({ saving: { ...get().saving, [key]: state } })
@@ -277,3 +291,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ revealRequest: { stepId, kind, line, token: next() } })
   },
 }))
+
+// Solo en desarrollo: acceso al store para QA automatizado (Playwright).
+if (import.meta.env.DEV) {
+  ;(globalThis as unknown as { __stepdb?: unknown }).__stepdb = { store: useEditorStore }
+}

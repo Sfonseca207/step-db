@@ -211,3 +211,75 @@
     stroke-dashoffset: 0;
   }
 }
+
+/* Step activo: pulso sutil (RF-13) */
+.sdb-pulse {
+  box-shadow: 0 0 0 0 var(--pulse);
+  animation: sdb-pulse 2s ease-out infinite;
+}
+@keyframes sdb-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--pulse) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--pulse) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+/* Micro-celebración (P2) */
+.sdb-particle {
+  animation: sdb-burst 900ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes sdb-burst {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+.sdb-reveal-line {
+  background: #fef9c3;
+}
+
+/* Paneles redimensionables */
+.sdb-resizer {
+  width: 6px;
+  margin: 0 -3px;
+  cursor: col-resize;
+  position: relative;
+  z-index: 20;
+}
+.sdb-resizer::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  transition: background 150ms ease;
+}
+.sdb-resizer:hover::after,
+.sdb-resizer.active::after {
+  background: #cbd5e1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sdb-pulse,
+  .sdb-particle {
+    animation: none !important;
+  }
+  .sdb-particle {
+    display: none;
+  }
+}
+
+.sdb-no-scrollbar {
+  scrollbar-width: none;
+}
+.sdb-no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
