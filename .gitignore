@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 
 .env
+
+# Datos locales
+.data
+test-results
+playwright-report

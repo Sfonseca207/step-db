@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: stepdb-postgres
+    environment:
+      POSTGRES_USER: stepdb
+      POSTGRES_PASSWORD: stepdb
+      POSTGRES_DB: stepdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - stepdb-pgdata:/var/lib/postgresql
+      - ./docker/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stepdb -d stepdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  stepdb-pgdata:
