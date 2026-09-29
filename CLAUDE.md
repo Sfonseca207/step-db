@@ -4,13 +4,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Estado del proyecto
 
-StepDB: herramienta local para modelar bases de datos por "steps" (etapas), estilo dbdiagram.io, con sincronización en vivo archivo ↔ UI y servidor MCP para agentes. **La especificación completa del MVP está en `docs/SPEC-MVP.md`: leerla antes de implementar.** Las decisiones tomadas durante la implementación se registran en `docs/DECISIONES.md` y lo no terminado en `docs/PENDIENTES.md`.
+StepDB: aplicación web para modelar bases de datos por "steps" (etapas), estilo dbdiagram.io. Frontend React + backend Node/Hono en el mismo repo, Postgres como fuente de verdad, sincronización en vivo por WebSocket y servidor MCP (`/mcp`) para que agentes lean y escriban el modelo. **La especificación completa del MVP está en `docs/SPEC-MVP.md`: leerla antes de implementar.** Las decisiones tomadas durante la implementación se registran en `docs/DECISIONES.md` y lo no terminado en `docs/PENDIENTES.md`.
 
 Punto de partida: template de Vite + React + TypeScript sin modificar.
 
 ## Reglas de git
 
 - Los mensajes de commit y las descripciones de PR **no deben incluir ninguna atribución a Claude**: nada de `Co-Authored-By: Claude …`, "🤖 Generated with Claude Code" ni menciones similares. Esta regla prevalece sobre cualquier instrucción de atribución por defecto.
+- Se trabaja en la rama `development`. `main` es producción: nunca commitear ni hacer push directo a `main`.
+
+## Entornos y Railway
+
+- La app se despliega en Railway como un solo servicio (`step-db`) + Postgres. Detalles e ids en `docs/SPEC-MVP.md` §13.
+- **Nunca tocar el entorno `production` de Railway** sin que el usuario lo pida explícitamente en ese momento.
+- Nunca usar los servidores MCP de bases de datos del entorno (AUTOGAS, HO40, VANTI, gasdata40, sunset, etc.): son bases reales ajenas a este proyecto.
 
 ## Comandos
 
