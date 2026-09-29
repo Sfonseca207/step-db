@@ -11,7 +11,9 @@ injectWebSocket(server)
 
 function shutdown() {
   server.close(() => process.exit(0))
-  setTimeout(() => process.exit(0), 3000).unref()
+  // Los WebSocket abiertos impedirían cerrar: se cortan y la UI se reconecta sola.
+  ;(server as unknown as { closeAllConnections?: () => void }).closeAllConnections?.()
+  setTimeout(() => process.exit(0), 1500).unref()
 }
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)

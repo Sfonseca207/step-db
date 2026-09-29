@@ -34,6 +34,7 @@ export const LINT_RULE_LABELS: Record<string, string> = {
   'fk-without-index': 'FK sin índice',
   'logical-ref-without-index': 'Referencia lógica sin índice',
   'sql-log-table': 'Log en SQL',
+  'fk-type-mismatch': 'FK con tipos distintos',
 }
 
 /** ¿Las columnas están cubiertas (como prefijo) por la PK, un índice o un `unique`? */
@@ -47,7 +48,7 @@ function isIndexed(table: TableModel, columns: string[]): boolean {
   return candidates.some((idx) => columns.every((c, i) => idx[i] === c))
 }
 
-/** Linter del modelo (RF-70): advertencias que no bloquean el guardado. */
+/** Linter del modelo (RF-70 y una regla extra de tipos): advertencias que no bloquean el guardado. */
 export function lintModel(model: ProjectModel, conventions: Conventions): Diagnostic[] {
   const out: Diagnostic[] = []
   const caseRe = CASE_RE[conventions.case]
@@ -88,6 +89,24 @@ export function lintModel(model: ProjectModel, conventions: Conventions): Diagno
         warn(t, 'sql-log-table', `'${t.key}' parece un log: evalúa si debería ser una colección MongoDB en lugar de una tabla SQL`),
       )
     }
+  }
+
+  // 7. FK cuyas columnas no tienen el mismo tipo que las referenciadas
+  const normalizeType = (type: string) => type.toLowerCase().replace(/\s+/g, '')
+  for (const r of model.relations) {
+    if (r.kind !== 'fk') continue
+    const from = tables.get(r.from.table)
+    const to = tables.get(r.to.table)
+    if (!from || !to) continue
+    r.from.columns.forEach((name, i) => {
+      const a = from.columns.find((c) => c.name === name)
+      const b = to.columns.find((c) => c.name === r.to.columns[i])
+      if (a && b && normalizeType(a.type) !== normalizeType(b.type)) {
+        out.push(
+          warn(from, 'fk-type-mismatch', `'${from.key}.${a.name}' es ${a.type} pero referencia a '${to.key}.${b.name}', que es ${b.type}`, a.line),
+        )
+      }
+    })
   }
 
   // 4 y 5. Índices en columnas de referencia

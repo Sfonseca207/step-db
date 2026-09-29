@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createBrowserRouter } from 'react-router'
+import { createBrowserRouter, Navigate } from 'react-router'
 import { RouterProvider } from 'react-router/dom'
 import { RequireAuth } from './components/RequireAuth.tsx'
 import AuthPage from './pages/AuthPage.tsx'
@@ -25,7 +25,7 @@ const router = createBrowserRouter([
   { path: '/', element: <RequireAuth><ProjectsPage /></RequireAuth> },
   { path: '/tokens', element: <RequireAuth><Suspense fallback={loading}><TokensPage /></Suspense></RequireAuth> },
   { path: '/p/:projectId', element: <RequireAuth><Suspense fallback={loading}><EditorPage /></Suspense></RequireAuth> },
-  { path: '*', element: <RequireAuth><ProjectsPage /></RequireAuth> },
+  { path: '*', element: <Navigate to="/" replace /> },
 ])
 
 createRoot(document.getElementById('root')!).render(

@@ -1,5 +1,5 @@
 import { useQueryClient, type QueryClient } from '@tanstack/react-query'
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ProjectDto, WriteFileConflict, WriteFileInvalid, WriteFileOk } from '../core/api.ts'
 import { formatDiagnostic } from '../core/model.ts'
 import type { FileKind } from '../core/types.ts'
@@ -104,7 +104,8 @@ export function useAutosave(project: ProjectDto | undefined) {
       const key = fileKey(stepId, kind)
       const store = useEditorStore.getState()
       inFlight.current.add(key)
-      store.setSaving(key, 'saving')
+      // Durante un reintento se conserva el estado de error (no parpadea "Guardando…").
+      if (store.saving[key] !== 'error') store.setSaving(key, 'saving')
       try {
         const { status, data } = await apiRaw<WriteFileOk | WriteFileConflict | WriteFileInvalid>(
           'PUT',
@@ -133,14 +134,31 @@ export function useAutosave(project: ProjectDto | undefined) {
           })
         }
       } catch {
+        const alreadyFailed = useEditorStore.getState().saving[key] === 'error'
         useEditorStore.getState().setSaving(key, 'error')
-        useEditorStore.getState().pushToast({ title: 'Sin conexión', body: 'No se pudo guardar; se reintentará.', tone: 'error' })
+        if (!alreadyFailed) {
+          useEditorStore.getState().pushToast({
+            title: 'Sin conexión',
+            body: 'No se pudo guardar. Tu borrador está a salvo y se guardará al volver la conexión.',
+            tone: 'error',
+          })
+        }
       } finally {
         inFlight.current.delete(key)
       }
     },
     [qc],
   )
+
+  // Reintento tras un fallo de red: al volver la conexión en vivo o, si no, cada pocos segundos.
+  const live = useEditorStore((s) => s.live)
+  const [retryTick, setRetryTick] = useState(0)
+  const hasFailed = useEditorStore((s) => Object.entries(s.saving).some(([key, state]) => state === 'error' && s.drafts[key] !== undefined))
+  useEffect(() => {
+    if (!hasFailed) return
+    const timer = setTimeout(() => setRetryTick((t) => t + 1), live === 'online' ? 1500 : 6000)
+    return () => clearTimeout(timer)
+  }, [hasFailed, live, retryTick])
 
   useEffect(() => {
     if (!project || Object.keys(drafts).length === 0) return
@@ -161,7 +179,7 @@ export function useAutosave(project: ProjectDto | undefined) {
       }
     }, AUTOSAVE_MS)
     return () => clearTimeout(timer)
-  }, [project, drafts, save])
+  }, [project, drafts, save, retryTick])
 
   /** Resolución del diálogo de conflicto (RF-33). */
   const resolveConflict = useCallback(

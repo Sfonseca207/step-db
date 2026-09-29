@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
 import type { ProjectDto, ProjectSummaryDto } from '../core/api.ts'
 import { STEP_PALETTE } from '../core/palette.ts'
 import { AppShell } from '../components/AppShell.tsx'
@@ -18,6 +18,8 @@ export default function ProjectsPage() {
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState<{ id: string; name: string } | null>(null)
   const [deleting, setDeleting] = useState<ProjectSummaryDto | null>(null)
+  const location = useLocation()
+  const [notice, setNotice] = useState<string | null>((location.state as { notice?: string } | null)?.notice ?? null)
 
   const create = useMutation({
     mutationFn: (n: string) => api<ProjectDto>('POST', '/api/projects', { name: n }),
@@ -83,6 +85,14 @@ export default function ProjectsPage() {
           </div>
         </div>
 
+        {notice && (
+          <div className="sdb-rise mb-5 flex items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-900" role="status">
+            {notice}
+            <button className="text-xs font-medium underline" onClick={() => setNotice(null)}>
+              Entendido
+            </button>
+          </div>
+        )}
         {projects.isLoading && <p className="text-sm text-slate-400">Cargando…</p>}
         {projects.isError && <p className="text-sm text-red-600">No se pudieron cargar los proyectos.</p>}
         {!projects.isLoading && list.length === 0 && (
@@ -138,11 +148,17 @@ export default function ProjectsPage() {
                 <p className="mt-3 text-xs text-slate-400">
                   {p.stepCount} {p.stepCount === 1 ? 'step' : 'steps'} · actualizado {relativeDate(p.updatedAt)}
                 </p>
-                <div className="relative z-10 mt-3 flex gap-1 opacity-0 transition group-hover:opacity-100 focus-within:opacity-100">
-                  <button className="btn btn-ghost px-2 py-1 text-xs" onClick={() => setRenaming({ id: p.id, name: p.name })}>
+                <div className="relative z-10 mt-3 -ml-2 flex gap-1">
+                  <button
+                    className="btn btn-ghost px-2 py-1 text-xs text-slate-400 group-hover:text-slate-700 focus-visible:text-slate-700"
+                    onClick={() => setRenaming({ id: p.id, name: p.name })}
+                  >
                     Renombrar
                   </button>
-                  <button className="btn btn-ghost px-2 py-1 text-xs text-red-600" onClick={() => setDeleting(p)}>
+                  <button
+                    className="btn btn-ghost px-2 py-1 text-xs text-slate-400 group-hover:text-red-600 focus-visible:text-red-600"
+                    onClick={() => setDeleting(p)}
+                  >
                     Borrar
                   </button>
                 </div>

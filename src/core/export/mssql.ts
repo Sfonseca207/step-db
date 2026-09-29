@@ -4,7 +4,23 @@ import { formatWorkDate, orderedSteps, type ExportInput, type ExportOptions, typ
 const q = (name: string) => `[${name.replace(/]/g, ']]')}]`
 const qt = (t: { schema: string; name: string }) => `${q(t.schema)}.${q(t.name)}`
 const str = (s: string) => `N'${s.replace(/'/g, "''")}'`
-const ident = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '_').slice(0, 120)
+const ident = (s: string) => s.replace(/[^A-Za-z0-9_]/g, '_')
+
+/** Hash corto y estable (FNV-1a) para acortar nombres sin perder unicidad. */
+function shortHash(text: string): string {
+  let h = 0x811c9dc5
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i)
+    h = Math.imul(h, 0x01000193)
+  }
+  return (h >>> 0).toString(16).padStart(8, '0')
+}
+
+/** Nombre de constraint o índice: SQL Server admite hasta 128 caracteres. */
+export function objectName(prefix: string, ...parts: string[]): string {
+  const name = [prefix, ...parts.map(ident)].join('_')
+  return name.length <= 128 ? name : `${name.slice(0, 119)}_${shortHash(name)}`
+}
 
 function defaultSql(c: ColumnModel): string | null {
   const d = c.default
@@ -138,7 +154,7 @@ export function exportMssql(input: ExportInput, opts: ExportOptions = {}): strin
       const pk = pkColumns(t)
       const inlinePk = pk.length === 1
       const lines = cols.map((c) => `  ${columnSql(c, inlinePk, enums)}`)
-      if (pk.length > 1) lines.push(`  CONSTRAINT ${q(`PK_${ident(t.name)}`)} PRIMARY KEY (${pk.map(q).join(', ')})`)
+      if (pk.length > 1) lines.push(`  CONSTRAINT ${q(objectName('PK', t.name))} PRIMARY KEY (${pk.map(q).join(', ')})`)
       const create = `CREATE TABLE ${qt(t)} (\n${lines.join(',\n')}\n);`
       batch(idem ? `IF OBJECT_ID(${str(`${t.schema}.${t.name}`)}, N'U') IS NULL\nBEGIN\n${create}\nEND` : create)
     }
@@ -176,7 +192,7 @@ export function exportMssql(input: ExportInput, opts: ExportOptions = {}): strin
       fkSql.push(`-- Relación N:M ${child.key} <> ${parent.key}: requiere una tabla intermedia (no se genera FK).\n`)
       continue
     }
-    const name = r.name ?? `FK_${ident(child.name)}_${childCols.map(ident).join('_')}_${ident(parent.name)}`
+    const name = r.name ?? objectName('FK', child.name, ...childCols, parent.name)
     let stmt = `ALTER TABLE ${qt(child)} ADD CONSTRAINT ${q(name)}\n  FOREIGN KEY (${childCols.map(q).join(', ')}) REFERENCES ${qt(parent)} (${parentCols.map(q).join(', ')})`
     if (r.onDelete) stmt += `\n  ON DELETE ${r.onDelete.toUpperCase()}`
     if (r.onUpdate) stmt += `\n  ON UPDATE ${r.onUpdate.toUpperCase()}`
@@ -200,7 +216,7 @@ export function exportMssql(input: ExportInput, opts: ExportOptions = {}): strin
         idxSql.push(`-- Índice por expresión en ${t.key} (${idx.columns.join(', ')}): SQL Server no lo soporta; usar una columna calculada.\n`)
         continue
       }
-      const name = idx.name ?? `IX_${ident(t.name)}_${idx.columns.map(ident).join('_')}`
+      const name = idx.name ?? objectName(idx.unique ? 'UX' : 'IX', t.name, ...idx.columns)
       const stmt = `CREATE ${idx.unique ? 'UNIQUE ' : ''}INDEX ${q(name)} ON ${qt(t)} (${idx.columns.map(q).join(', ')});`
       idxSql.push(
         `${idem ? `IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = ${str(name)} AND object_id = OBJECT_ID(${str(`${t.schema}.${t.name}`)}))\n  ${stmt}` : stmt}\nGO\n`,

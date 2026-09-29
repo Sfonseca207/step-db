@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router'
 import { UserMenu } from '../components/AppShell.tsx'
 import { IconPanelLeft, IconPanelRight } from '../components/icons.tsx'
 import { Logo } from '../components/Logo.tsx'
+import { ApiError } from '../lib/api.ts'
 import { useViewportWidth } from '../lib/useViewport.ts'
 import { Canvas } from './canvas/Canvas.tsx'
 import { ConflictDialog } from './ConflictDialog.tsx'
@@ -14,6 +15,7 @@ import { SidePanel } from './panels/SidePanel.tsx'
 import { StepsPanel } from './panels/StepsPanel.tsx'
 import { useRealtime } from './realtime.ts'
 import { useEditorStore } from './store.ts'
+import { LiveStatus } from './LiveStatus.tsx'
 import { Toasts } from './Toasts.tsx'
 import { ActivityPanel } from './ActivityPanel.tsx'
 import { ReplayOverlay } from './Replay.tsx'
@@ -90,12 +92,23 @@ export default function EditorPage() {
     return <div className="flex h-full items-center justify-center text-sm text-slate-400">Cargando proyecto…</div>
   }
   if (project.isError || !project.data) {
+    const missing = project.error instanceof ApiError && project.error.status === 404
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 text-slate-500">
-        <p>No se encontró el proyecto.</p>
-        <Link to="/" className="btn">
-          Volver a proyectos
-        </Link>
+      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-slate-500">
+        <p className="font-medium text-slate-800">{missing ? 'No se encontró el proyecto.' : 'No se pudo cargar el proyecto.'}</p>
+        <p className="text-sm">
+          {missing ? 'Puede que se haya borrado o que no tengas acceso.' : 'Revisa tu conexión; tus borradores siguen guardados en este navegador.'}
+        </p>
+        <div className="flex gap-2">
+          {!missing && (
+            <button className="btn btn-primary" onClick={() => void project.refetch()}>
+              Reintentar
+            </button>
+          )}
+          <Link to="/" className="btn">
+            Volver a proyectos
+          </Link>
+        </div>
       </div>
     )
   }
@@ -170,6 +183,7 @@ export default function EditorPage() {
             <ErrorBanner />
             <ActivityPanel projectId={projectId} />
             <ReplayOverlay workDates={Object.fromEntries(project.data.steps.map((s) => [s.id, s.workDate]))} />
+            <LiveStatus />
             <Toasts />
             {compact && (leftOpen || rightOpen) && (
               <button

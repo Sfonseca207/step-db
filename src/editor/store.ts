@@ -102,6 +102,8 @@ interface EditorState {
   /** Posición máxima de step visible durante el replay (oculta columnas futuras). */
   replayMaxPos: number | null
   activityOpen: boolean
+  /** Estado de la conexión en vivo (WebSocket). */
+  live: 'connecting' | 'online' | 'offline'
   highlights: Highlights
   toasts: Toast[]
   /** Petición de centrar el canvas (tabla o step). */
@@ -129,6 +131,7 @@ interface EditorState {
     visible?: { tables: Set<string>; relations: Set<string>; maxPos: number } | null,
   ): void
   toggleActivity(): void
+  setLive(live: EditorState['live']): void
   /** Marca lo que cambió para animarlo. `prev` permite conservar lo eliminado durante su fade-out. */
   applyDiff(diff: ModelDiff, prev?: ProjectModel | null): void
   pushToast(toast: Omit<Toast, 'id'>): void
@@ -187,6 +190,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   replayRelations: null,
   replayMaxPos: null,
   activityOpen: false,
+  live: 'connecting',
   highlights: emptyHighlights(),
   toasts: [],
   centerRequest: null,
@@ -305,6 +309,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   toggleActivity() {
     set({ activityOpen: !get().activityOpen })
+  },
+  setLive(live) {
+    if (get().live !== live) set({ live })
   },
   applyDiff(diff, prev) {
     const h = get().highlights

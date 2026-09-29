@@ -78,7 +78,7 @@ export function useRealtime(projectId: string) {
         }
         case 'project.changed':
           if (ev.reason === 'deleted') {
-            navigate('/', { replace: true })
+            navigate('/', { replace: true, state: { notice: 'El proyecto que tenías abierto fue borrado.' } })
             return
           }
           if (ev.clientId !== CLIENT_ID) {
@@ -113,6 +113,7 @@ export function useRealtime(projectId: string) {
       ws.onopen = () => {
         if (retry > 0) void qc.refetchQueries({ queryKey: key })
         retry = 0
+        useEditorStore.getState().setLive('online')
         pingTimer = setInterval(() => ws?.readyState === WebSocket.OPEN && ws.send('ping'), 25_000)
       }
       ws.onmessage = (e) => {
@@ -128,6 +129,8 @@ export function useRealtime(projectId: string) {
       ws.onclose = () => {
         if (pingTimer) clearInterval(pingTimer)
         if (closed) return
+        // Un corte breve no se anuncia; si el reintento también falla, sí.
+        if (retry > 0) useEditorStore.getState().setLive('offline')
         const delay = Math.min(10_000, 500 * 2 ** retry++)
         reconnectTimer = setTimeout(connect, delay)
       }

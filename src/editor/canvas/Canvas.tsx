@@ -240,13 +240,21 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
     () => (replayVisible ? nodes.map((n) => ({ ...n, hidden: !replayVisible.has(n.id) })) : nodes),
     [nodes, replayVisible],
   )
+  const hoveredEdge = useEditorStore((s) => s.hoveredEdge)
+  const selectedTable = useEditorStore((s) => s.selectedTable)
   const visibleEdges = useMemo(
     () =>
       replayVisible
         ? // Se filtran (no solo se ocultan): el replay quita filas y sus handles.
           edges.filter((e) => replayVisible.has(e.source) && replayVisible.has(e.target) && replayRelations?.has(e.id))
-        : edges,
-    [edges, replayVisible, replayRelations],
+        : // La relación bajo el cursor y las de la tabla seleccionada se dibujan por encima de las tablas,
+          // para poder seguirlas cuando pasan por detrás de otra.
+          edges.map((e) =>
+            e.id === hoveredEdge || (selectedTable !== null && (e.source === selectedTable || e.target === selectedTable))
+              ? { ...e, zIndex: 1001 }
+              : e,
+          ),
+    [edges, replayVisible, replayRelations, hoveredEdge, selectedTable],
   )
 
   // Acciones expuestas a la barra de herramientas.

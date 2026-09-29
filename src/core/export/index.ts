@@ -6,7 +6,7 @@ import type { ExportInput, ExportOptions, ExportTarget } from './types.ts'
 export * from './types.ts'
 export { exportCombinedDbml } from './dbml.ts'
 export { collectionSchema, exportMongo } from './mongo.ts'
-export { exportMssql, splitViewBatches } from './mssql.ts'
+export { exportMssql, objectName, splitViewBatches } from './mssql.ts'
 
 export function runExport(target: ExportTarget, input: ExportInput, opts: ExportOptions = {}): string {
   if (target === 'mssql') return exportMssql(input, opts)

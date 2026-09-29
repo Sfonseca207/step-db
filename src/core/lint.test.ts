@@ -50,6 +50,13 @@ describe('lintModel (RF-70)', () => {
     expect(codes(w)).toEqual(['sql-log-table:ventas.bitacora_envios', 'sql-log-table:ventas.log'])
   })
 
+  it('FK con tipo distinto al de la columna referenciada', () => {
+    const w = lint('Table a.padre {\n  id bigint [pk]\n}\nTable a.hija {\n  id int [pk]\n  padre_id int [ref: > a.padre.id]\n  indexes {\n    padre_id\n  }\n}')
+    expect(codes(w)).toEqual(['fk-type-mismatch:a.hija'])
+    expect(w[0].line).toBe(6)
+    expect(w[0].message).toBe("'a.hija.padre_id' es int pero referencia a 'a.padre.id', que es bigint")
+  })
+
   it('el proyecto de ejemplo solo avisa la FK tercero_id sin índice', async () => {
     const { loadGasAppSeed } = await import('../../server/seed/gasapp/index.ts')
     const seed = loadGasAppSeed()

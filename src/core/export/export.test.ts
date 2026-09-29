@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { loadGasAppSeed } from '../../../server/seed/gasapp/index.ts'
 import { buildProjectModel } from '../model.ts'
 import type { StepSource } from '../types.ts'
-import { collectionSchema, exportCombinedDbml, exportMongo, exportMssql, splitViewBatches, type ExportInput } from './index.ts'
+import { collectionSchema, exportCombinedDbml, exportMongo, exportMssql, objectName, splitViewBatches, type ExportInput } from './index.ts'
 
 function gasapp(): ExportInput {
   const seed = loadGasAppSeed()
@@ -79,6 +79,13 @@ describe('export SQL Server', () => {
     expect(idem).toMatch(/IF OBJECT_ID\(N'ventas\.venta', N'U'\) IS NULL\nBEGIN\nCREATE TABLE/)
     expect(idem).toMatch(/CREATE OR ALTER VIEW/)
     await expect(idem).toMatchFileSnapshot('./__snapshots__/gasapp.idempotent.mssql.sql')
+  })
+
+  it('los nombres de constraints no superan los 128 caracteres de SQL Server', () => {
+    expect(objectName('FK', 'venta', 'tercero_id', 'tercero')).toBe('FK_venta_tercero_id_tercero')
+    const long = objectName('FK', 'a'.repeat(80), 'columna_larga', 'b'.repeat(80))
+    expect(long).toHaveLength(128)
+    expect(long).not.toBe(objectName('FK', 'a'.repeat(80), 'columna_larga', 'b'.repeat(81)))
   })
 
   it('divide las vistas en lotes', () => {
