@@ -1,20 +1,32 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 
-export function Modal({ children, onClose }: { children: ReactNode; onClose: () => void }) {
+/**
+ * Diálogo modal sobre `<dialog>` nativo: el fondo queda inerte, el foco se
+ * queda dentro y Escape lo cierra. `onClose` vacío = hay que elegir una opción.
+ */
+export function Modal({ children, onClose, dismissible = true }: { children: ReactNode; onClose: () => void; dismissible?: boolean }) {
+  const ref = useRef<HTMLDialogElement>(null)
+  useEffect(() => {
+    const dialog = ref.current
+    if (dialog && !dialog.open) dialog.showModal()
+    return () => dialog?.close()
+  }, [])
   return (
-    <div
-      className="sdb-overlay fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4 backdrop-blur-[2px]"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose()
+    <dialog
+      ref={ref}
+      role="dialog"
+      aria-modal
+      className="sdb-dialog nokey"
+      onCancel={(e) => {
+        e.preventDefault()
+        if (dismissible) onClose()
       }}
-      onKeyDown={(e) => {
-        if (e.key === 'Escape') onClose()
+      onMouseDown={(e) => {
+        if (dismissible && e.target === e.currentTarget) onClose()
       }}
     >
-      <div role="dialog" aria-modal className="sdb-pop w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
-        {children}
-      </div>
-    </div>
+      <div className="p-5">{children}</div>
+    </dialog>
   )
 }
 

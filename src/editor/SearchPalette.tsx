@@ -11,7 +11,7 @@ interface Hit {
   score: number
 }
 
-function score(text: string, q: string): number {
+function scoreTerm(text: string, q: string): number {
   const t = text.toLowerCase()
   if (t === q) return 100
   if (t.startsWith(q)) return 80
@@ -21,6 +21,19 @@ function score(text: string, q: string): number {
   let i = 0
   for (const ch of t) if (ch === q[i]) i++
   return i === q.length ? 20 : 0
+}
+
+/** Puntaje de una búsqueda de varias palabras ("log envio"): todas deben coincidir. */
+function score(text: string, query: string): number {
+  const terms = query.split(/[\s._]+/).filter(Boolean)
+  if (terms.length === 0) return 0
+  let total = 0
+  for (const term of terms) {
+    const s = scoreTerm(text, term)
+    if (s === 0) return 0
+    total += s
+  }
+  return total / terms.length
 }
 
 /** Búsqueda rápida Cmd/Ctrl+K de tablas y columnas (RF-28). */
@@ -60,7 +73,8 @@ export function SearchPalette() {
       if (ts > 0) out.push({ table: t.key, label: t.key, detail: t.store === 'mongo' ? 'colección' : 'tabla', color, score: ts + 5 })
       if (!q) continue
       for (const c of t.columns) {
-        const cs = score(c.name, q)
+        // La columna coincide por su nombre o, en búsquedas de varias palabras, por tabla + columna.
+        const cs = Math.max(score(c.name, q), q.includes(' ') ? score(`${t.key}.${c.name}`, q) - 10 : 0)
         if (cs > 0) out.push({ table: t.key, column: c.name, label: `${t.key}.${c.name}`, detail: c.type, color, score: cs })
       }
     }
@@ -87,12 +101,12 @@ export function SearchPalette() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/20 pt-[12vh] backdrop-blur-[1px]"
+      className="sdb-overlay nokey fixed inset-0 z-50 flex items-start justify-center bg-slate-900/20 pt-[12vh]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) setOpen(false)
       }}
     >
-      <div className="w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" role="dialog" aria-label="Buscar">
+      <div className="sdb-pop w-full max-w-lg overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" role="dialog" aria-label="Buscar">
         <div className="flex items-center gap-2 border-b border-slate-100 px-4">
           <IconSearch className="text-slate-400" />
           <input

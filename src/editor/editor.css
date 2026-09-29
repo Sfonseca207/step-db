@@ -358,3 +358,25 @@
     animation: none;
   }
 }
+
+/* Reordenar steps: marca dónde caerá la tarjeta sin mover el layout */
+.sdb-drop-target::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 2rem;
+  right: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: #0f172a;
+}
+
+/* Paneles flotantes en pantallas angostas */
+.sdb-panel-in {
+  animation: sdb-fade-in 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdb-panel-in {
+    animation: none;
+  }
+}

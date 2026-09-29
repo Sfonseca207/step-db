@@ -9,6 +9,35 @@ import { useEditorStore } from './store.ts'
 
 const SOURCE_LABEL: Record<string, string> = { mcp: 'Claude', ui: 'Otra pestaña', api: 'API', seed: 'Ejemplo' }
 
+/** Texto del toast para un cambio externo de steps o del proyecto. */
+function describeProjectChange(
+  reason: string,
+  before: ProjectDto | undefined,
+  after: ProjectDto,
+): { body: string; color?: string } | null {
+  const label = (s: { position: number; name: string }) => `${String(s.position).padStart(2, '0')} · ${s.name}`
+  if (reason === 'steps') {
+    const known = new Map((before?.steps ?? []).map((s) => [s.id, s]))
+    const created = after.steps.find((s) => !known.has(s.id))
+    if (created) return { body: `Nuevo step ${label(created)}`, color: created.color }
+    const changed = after.steps.find((s) => {
+      const old = known.get(s.id)
+      return old && (old.name !== s.name || old.color !== s.color || old.status !== s.status || old.workDate !== s.workDate || old.description !== s.description)
+    })
+    if (!changed) return null
+    const old = known.get(changed.id)!
+    if (old.status !== changed.status && changed.status === 'completado') return { body: `Step ${label(changed)} completado`, color: changed.color }
+    return { body: `Step ${label(changed)} actualizado`, color: changed.color }
+  }
+  if (reason === 'order') return { body: 'Se reordenaron los steps' }
+  if (reason === 'active') {
+    const active = after.steps.find((s) => s.id === after.activeStepId)
+    return active ? { body: `Step activo: ${label(active)}`, color: active.color } : null
+  }
+  if (reason === 'meta') return { body: 'Se actualizaron los datos del proyecto' }
+  return null
+}
+
 /** WebSocket del proyecto con reconexión (backoff) y refetch al reconectar (SPEC §7.2). */
 export function useRealtime(projectId: string) {
   const qc = useQueryClient()
@@ -52,7 +81,13 @@ export function useRealtime(projectId: string) {
             navigate('/', { replace: true })
             return
           }
-          if (ev.clientId !== CLIENT_ID) await qc.refetchQueries({ queryKey: key })
+          if (ev.clientId !== CLIENT_ID) {
+            const before = qc.getQueryData<ProjectDto>(key)
+            await qc.refetchQueries({ queryKey: key })
+            const after = qc.getQueryData<ProjectDto>(key)
+            const note = after ? describeProjectChange(ev.reason, before, after) : null
+            if (note) store.pushToast({ title: SOURCE_LABEL[ev.source] ?? ev.source, body: note.body, color: note.color })
+          }
           return
         case 'layout.changed':
           if (ev.clientId !== CLIENT_ID) await qc.refetchQueries({ queryKey: key })

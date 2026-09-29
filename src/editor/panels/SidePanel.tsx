@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import type { ProjectDto } from '../../core/api.ts'
 import { LINT_RULE_LABELS } from '../../core/lint.ts'
 import { formatDiagnostic } from '../../core/model.ts'
@@ -71,29 +71,24 @@ export function SidePanel({ project }: { project: ProjectDto }) {
   const warnings = useEditorStore((s) => s.warnings)
   const model = useEditorStore((s) => s.model)
   const revealRequest = useEditorStore((s) => s.revealRequest)
-  const [dbmlKind, setDbmlKind] = useState<DbmlKind>('model')
+  /** Archivo DBML elegido a mano (chips), por step. */
+  const [choice, setChoice] = useState<{ stepId: string; kind: DbmlKind; after: number } | null>(null)
 
   const stepId = selectedStepId ?? project.activeStepId ?? project.steps[0]?.id
   const step = project.steps.find((s) => s.id === stepId) ?? project.steps[0]
 
-  // Ir a la definición: cambia al archivo pedido.
-  useEffect(() => {
-    if (!revealRequest) return
-    const kind = revealRequest.kind
-    if (kind === 'model' || kind === 'mongo') {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- responde a una petición externa (doble clic en el canvas)
-      setDbmlKind(kind)
-    }
-  }, [revealRequest])
-
-  // Al cambiar de step, abre el archivo que tenga contenido (p. ej. un step solo Mongo).
-  const stepForKind = step?.id
+  // Qué archivo DBML se muestra: lo último entre la elección manual y un "ir a la definición";
+  // si no hay ninguno, el archivo que tenga contenido (p. ej. un step solo Mongo).
+  const requested =
+    revealRequest && step && revealRequest.stepId === step.id && (revealRequest.kind === 'model' || revealRequest.kind === 'mongo')
+      ? { kind: revealRequest.kind, token: revealRequest.token }
+      : null
   const onlyMongo = step ? step.files.model.content.trim() === '' && step.files.mongo.content.trim() !== '' : false
-  useEffect(() => {
-    if (!stepForKind) return
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- elige el archivo inicial del step seleccionado
-    setDbmlKind(onlyMongo ? 'mongo' : 'model')
-  }, [stepForKind, onlyMongo])
+  const chosen = choice && step && choice.stepId === step.id && (!requested || choice.after > requested.token) ? choice.kind : null
+  const dbmlKind: DbmlKind = chosen ?? requested?.kind ?? (onlyMongo ? 'mongo' : 'model')
+  const setDbmlKind = (kind: DbmlKind) => {
+    if (step) setChoice({ stepId: step.id, kind, after: (revealRequest?.token ?? 0) + 0.5 })
+  }
 
   const counts = useMemo(() => {
     const tables = model?.tables.filter((t) => t.stepId === step?.id) ?? []

@@ -8,7 +8,7 @@ export function ConflictDialog({ onResolve }: { onResolve: (choice: 'mine' | 'th
   if (!conflict) return null
   const step = steps[conflict.stepId]
   return (
-    <Modal onClose={() => {}}>
+    <Modal onClose={() => {}} dismissible={false}>
       <h2 className="text-base font-semibold text-slate-900">Conflicto al guardar</h2>
       <p className="mt-2 text-sm text-slate-600">
         El archivo <b className="font-mono">{step?.slug} · {conflict.kind}</b> cambió mientras lo editabas (versión{' '}

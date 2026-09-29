@@ -101,7 +101,7 @@ export function CodeEditor({ path, value, language, readOnly, diagnostics, revea
           scrollBeyondLastLine: false,
           renderLineHighlight: 'line',
           // El panel es angosto: ajustar líneas evita el scroll horizontal que esconde el inicio de cada línea.
-          wordWrap: 'on',
+          wordWrap: readOnly ? 'off' : 'on',
           wrappingIndent: 'deepIndent',
           automaticLayout: true,
           padding: { top: 10, bottom: 10 },

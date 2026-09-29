@@ -1,3 +1,5 @@
+import { slugify } from '../core/slug.ts'
+
 export function downloadText(fileName: string, text: string, mime = 'text/plain') {
   const blob = new Blob([text], { type: `${mime};charset=utf-8` })
   const url = URL.createObjectURL(blob)
@@ -19,6 +21,7 @@ export async function copyText(text: string): Promise<boolean> {
   }
 }
 
+/** "GasApp (ejemplo)" → "gasapp-ejemplo". */
 export function safeFileName(name: string): string {
-  return name.replace(/[^\w.-]+/g, '_')
+  return slugify(name)
 }

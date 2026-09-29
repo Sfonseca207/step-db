@@ -123,14 +123,15 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
       </div>
       <ol className="relative min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <span className="absolute top-2 bottom-2 left-[26px] w-px bg-slate-200" aria-hidden />
-        {project.steps.map((s) => {
+        {project.steps.map((s, index) => {
           const st = stats.get(s.id)
           const active = project.activeStepId === s.id
           const selected = selectedStepId === s.id
           return (
             <li
               key={s.id}
-              className={`relative pl-8 pb-2 transition ${overId === s.id ? 'pt-6' : ''}`}
+              className={`sdb-rise relative pl-8 pb-2 ${overId === s.id ? 'sdb-drop-target' : ''}`}
+              style={{ animationDelay: `${Math.min(index, 8) * 35}ms` }}
               draggable
               onDragStart={(e) => {
                 setDragId(s.id)

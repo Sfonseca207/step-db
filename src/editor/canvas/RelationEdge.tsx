@@ -23,14 +23,13 @@ function RelationEdgeComponent(props: EdgeProps<RelationEdgeType>) {
   const hovered = useEditorStore((s) => s.hoveredEdge === id)
   const newToken = useEditorStore((s) => s.highlights.newRelations[id])
   const selectedTable = useEditorStore((s) => s.selectedTable)
-  const dimmedByFocus = useEditorStore(
-    (s) => !!data && !!s.focusSet && (!s.focusSet.has(data.relation.from.table) || !s.focusSet.has(data.relation.to.table)),
-  )
+  const dimmedByFocus = useEditorStore((s) => s.focusRelations !== null && !s.focusRelations.has(id))
   if (!data) return null
   const { relation, fromColor, toColor, optionalOne, sourceDir, targetDir, removing } = data
   const logical = relation.kind === 'logical'
   const involved = selectedTable !== null && (relation.from.table === selectedTable || relation.to.table === selectedTable)
-  const dimmed = dimmedByFocus || (selectedTable !== null && !involved)
+  // La selección de una tabla manda sobre el enfoque por step.
+  const dimmed = selectedTable !== null ? !involved : dimmedByFocus
 
   // Aleja los extremos para dejar sitio a los marcadores.
   const sx = sourceX + sourceDir * 2

@@ -1,8 +1,9 @@
 import { create } from 'zustand'
 import { columnTable } from '../core/diff.ts'
+import { computeFocus, type Focus, type FocusMode } from './focus.ts'
 import type { ColumnModel, Diagnostic, FileKind, ModelDiff, ProjectModel, RelationModel } from '../core/types.ts'
 
-export type FocusMode = 'all' | 'step' | 'deps'
+export type { FocusMode } from './focus.ts'
 
 export interface StepMeta {
   id: string
@@ -83,6 +84,8 @@ interface EditorState {
   selectedStepId: string | null
   focusMode: FocusMode
   focusSet: Set<string> | null
+  /** Relaciones que quedan a color con el enfoque actual. */
+  focusRelations: Set<string> | null
   selectedTable: string | null
   /** Tablas relacionadas con la seleccionada (incluida ella). */
   selectedRelated: Set<string> | null
@@ -137,23 +140,7 @@ interface EditorState {
 let seq = 1
 const next = () => seq++
 
-function computeFocusSet(
-  model: ProjectModel | null,
-  mode: FocusMode,
-  stepId: string | null,
-): Set<string> | null {
-  if (!model || mode === 'all' || !stepId) return null
-  const own = new Set(model.tables.filter((t) => t.stepId === stepId).map((t) => t.key))
-  // Tablas de otros steps a las que el step agregó columnas también cuentan como suyas.
-  for (const t of model.tables) if (t.columns.some((c) => c.stepId === stepId)) own.add(t.key)
-  if (mode === 'step') return own
-  const withDeps = new Set(own)
-  for (const r of model.relations) {
-    if (own.has(r.from.table)) withDeps.add(r.to.table)
-    if (own.has(r.to.table)) withDeps.add(r.from.table)
-  }
-  return withDeps
-}
+const focusState = (f: Focus | null) => ({ focusSet: f?.tables ?? null, focusRelations: f?.relations ?? null })
 
 function computeRelated(model: ProjectModel | null, key: string | null): Set<string> | null {
   if (!key || !model || !model.tables.some((t) => t.key === key)) return null
@@ -187,6 +174,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedStepId: null,
   focusMode: 'all',
   focusSet: null,
+  focusRelations: null,
   selectedTable: null,
   selectedRelated: null,
   hoveredEdge: null,
@@ -218,6 +206,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedStepId: null,
       focusMode: 'all',
       focusSet: null,
+      focusRelations: null,
       selectedTable: null,
       selectedRelated: null,
       hoveredEdge: null,
@@ -241,7 +230,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       model: nextModel,
       errors,
-      focusSet: computeFocusSet(nextModel, s.focusMode, s.selectedStepId),
+      ...focusState(computeFocus(nextModel, s.focusMode, s.selectedStepId)),
       selectedRelated: computeRelated(nextModel, s.selectedTable),
     })
   },
@@ -272,11 +261,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
   selectStep(stepId) {
     const s = get()
-    set({ selectedStepId: stepId, focusSet: computeFocusSet(s.model, s.focusMode, stepId) })
+    // Sin step seleccionado no hay nada que enfocar: el modo vuelve a "Todos".
+    const focusMode = stepId ? s.focusMode : 'all'
+    set({
+      selectedStepId: stepId,
+      focusMode,
+      ...focusState(computeFocus(s.model, focusMode, stepId)),
+      // Enfocar un step reemplaza la selección de tabla (si no, ambas atenuaciones se cruzan).
+      ...(focusMode !== 'all' ? { selectedTable: null, selectedRelated: null } : {}),
+    })
   },
   setFocusMode(mode) {
     const s = get()
-    set({ focusMode: mode, focusSet: computeFocusSet(s.model, mode, s.selectedStepId) })
+    set({
+      focusMode: mode,
+      ...focusState(computeFocus(s.model, mode, s.selectedStepId)),
+      selectedTable: null,
+      selectedRelated: null,
+    })
   },
   selectTable(key) {
     set({ selectedTable: key, selectedRelated: computeRelated(get().model, key) })

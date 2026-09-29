@@ -1,4 +1,5 @@
 import { Parser } from '@dbml/core'
+import { translateParserMessage } from './messages.ts'
 import { DEFAULT_CONVENTIONS, type Conventions } from './schemas.ts'
 import type {
   BuildResult,
@@ -217,7 +218,7 @@ export function buildProjectModel(
     const diags = (err as { diags?: RawDiag[] }).diags
     if (Array.isArray(diags) && diags.length > 0) {
       const errors = diags.map((d) =>
-        diagFromLine(chunks, d.location?.start?.line, d.message, { code: 'parse' }, d.location?.start?.column),
+        diagFromLine(chunks, d.location?.start?.line, translateParserMessage(d.message), { code: 'parse' }, d.location?.start?.column),
       )
       return { model: null, errors: dedupeDiagnostics(errors) }
     }

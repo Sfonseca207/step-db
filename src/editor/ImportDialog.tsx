@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal } from '../components/ConfirmDialog.tsx'
 import type { ProjectDto } from '../core/api.ts'
 import { ddlToDbml } from '../core/import.ts'
+import { translateParserMessage } from '../core/messages.ts'
 import { setDraftContent } from './drafts.ts'
 import { fileKey, useEditorStore } from './store.ts'
 
@@ -23,7 +24,11 @@ export function ImportDialog({ project, onClose }: { project: ProjectDto; onClos
         dbml = ddlToDbml(text)
       } catch (e) {
         const diags = (e as { diags?: { message: string; location?: { start?: { line: number } } }[] }).diags
-        setError(diags?.[0] ? `Línea ${diags[0].location?.start?.line ?? '?'}: ${diags[0].message}` : 'No se pudo convertir el DDL')
+        setError(
+          diags?.[0]
+            ? `Línea ${diags[0].location?.start?.line ?? '?'}: ${translateParserMessage(diags[0].message)}`
+            : 'No se pudo convertir el DDL',
+        )
         return
       }
     }
@@ -66,6 +71,7 @@ export function ImportDialog({ project, onClose }: { project: ProjectDto; onClos
         </div>
       </div>
       <textarea
+        autoFocus
         className="input mt-3 h-56 font-mono text-xs"
         placeholder={mode === 'dbml' ? 'Table ventas.venta {\n  id bigint [pk]\n}' : 'CREATE TABLE dbo.Ventas (\n  Id bigint IDENTITY(1,1) PRIMARY KEY\n);'}
         value={text}

@@ -283,7 +283,7 @@ describe('exportación', () => {
     const step = await request('GET', `/api/projects/${p.id}/export/mssql?step=03-facturacion&idempotent=1&download=1`, {
       cookie: u.cookie,
     })
-    expect(step.headers.get('content-disposition')).toMatch(/_03-facturacion\.sql"/)
+    expect(step.headers.get('content-disposition')).toMatch(/filename="gasapp-ejemplo_03-facturacion\.sql"/)
     expect(await step.text()).toMatch(/IF OBJECT_ID\(N'facturacion\.factura', N'U'\) IS NULL/)
 
     const mongo = await (await request('GET', `/api/projects/${p.id}/export/mongo`, { cookie: u.cookie })).text()

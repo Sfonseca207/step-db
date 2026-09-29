@@ -45,8 +45,9 @@ function TableNodeComponent({ id, data }: NodeProps<TableNodeType>) {
   const reduced = useReducedMotion()
   const newToken = useEditorStore((s) => s.highlights.newTables[id])
   const removing = useEditorStore((s) => s.highlights.removedTables[id] !== undefined)
-  const dimmed = useEditorStore(
-    (s) => (s.focusSet !== null && !s.focusSet.has(id)) || (s.selectedRelated !== null && !s.selectedRelated.has(id)),
+  // La selección de una tabla manda sobre el enfoque por step.
+  const dimmed = useEditorStore((s) =>
+    s.selectedRelated !== null ? !s.selectedRelated.has(id) : s.focusSet !== null && !s.focusSet.has(id),
   )
   const selected = useEditorStore((s) => s.selectedTable === id)
   const hoverCols = useEditorStore((s) => s.hoverColumns[id] ?? EMPTY)

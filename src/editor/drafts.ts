@@ -92,7 +92,7 @@ export function useAutosave(project: ProjectDto | undefined) {
     if (count > 0) {
       useEditorStore.getState().pushToast({
         title: 'Borrador recuperado',
-        body: `Se recuperaron ${count} ${count === 1 ? 'archivo sin guardar' : 'archivos sin guardar'} de esta sesión.`,
+        body: count === 1 ? 'Se recuperó 1 archivo sin guardar de esta sesión.' : `Se recuperaron ${count} archivos sin guardar de esta sesión.`,
       })
     }
   }, [project])

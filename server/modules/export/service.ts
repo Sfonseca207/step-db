@@ -1,4 +1,5 @@
 import { runExport, exportInputFrom, type ExportTarget } from '../../../src/core/export/index.ts'
+import { slugify } from '../../../src/core/slug.ts'
 import { HttpError, notFound } from '../../lib/errors.ts'
 import { loadProjectModel } from '../files/service.ts'
 
@@ -17,5 +18,5 @@ export async function exportProject(userId: string, projectId: string, target: E
     stepId: step?.id,
     idempotent: params.idempotent,
   })
-  return { text, fileName: `${project.name.replace(/[^\w.-]+/g, '_')}${step ? `_${step.slug}` : ''}` }
+  return { text, fileName: `${slugify(project.name)}${step ? `_${step.slug}` : ''}` }
 }

@@ -47,6 +47,11 @@ export const IconDownload = (p: SVGProps<SVGSVGElement>) => (
     <path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" />
   </svg>
 )
+export const IconUpload = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M12 15V4m0 0-4 4m4-4 4 4M5 20h14" />
+  </svg>
+)
 export const IconSearch = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
     <circle cx="11" cy="11" r="6.5" />

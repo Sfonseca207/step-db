@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ProjectDto } from '../core/api.ts'
-import { IconHistory, IconHull, IconLayout, IconPlay, IconSearch } from '../components/icons.tsx'
+import { IconDownload, IconHistory, IconHull, IconLayout, IconPlay, IconSearch, IconUpload } from '../components/icons.tsx'
 import { canvasActions } from './canvas/actions.ts'
 import { ExportMenu } from './ExportMenu.tsx'
 import { ImportDialog } from './ImportDialog.tsx'
@@ -12,10 +12,13 @@ const MODES: { id: FocusMode; label: string; title: string }[] = [
   { id: 'deps', label: '+ deps', title: 'El step y las tablas con las que se relaciona' },
 ]
 
+/** Las etiquetas de los botones solo caben en pantallas anchas; debajo quedan los iconos con su título. */
+const LABEL = 'hidden min-[1400px]:inline'
+
 function IconButton(props: { label: string; active?: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
-      className={`btn px-2 ${props.active ? 'border-slate-400 bg-slate-100' : ''}`}
+      className={`btn shrink-0 px-2 ${props.active ? 'border-slate-400 bg-slate-100' : ''}`}
       onClick={props.onClick}
       title={props.label}
       aria-label={props.label}
@@ -52,8 +55,8 @@ export function Toolbar({ project }: { project: ProjectDto }) {
   }
 
   return (
-    <div className="ml-auto flex items-center gap-1.5">
-      <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5" role="radiogroup" aria-label="Modo de enfoque">
+    <div className="sdb-no-scrollbar ml-auto flex min-w-0 items-center gap-1.5 overflow-x-auto py-1 whitespace-nowrap">
+      <div className="flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-0.5" role="radiogroup" aria-label="Modo de enfoque">
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -61,8 +64,9 @@ export function Toolbar({ project }: { project: ProjectDto }) {
             aria-checked={focusMode === m.id}
             title={m.title}
             onClick={() => {
-              setFocusMode(m.id)
+              // Enfocar necesita un step: si no hay uno elegido, se usa el activo.
               if (m.id !== 'all' && !selectedStepId) selectStep(project.activeStepId ?? project.steps[0]?.id ?? null)
+              setFocusMode(m.id)
             }}
             className={`rounded-md px-2.5 py-1 text-xs font-medium transition ${
               focusMode === m.id ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
@@ -72,18 +76,24 @@ export function Toolbar({ project }: { project: ProjectDto }) {
           </button>
         ))}
       </div>
-      <div className="flex items-center">
-        <button className="btn rounded-r-none" onClick={organize} disabled={organizing || !!replay} title="Auto-organizar con ELK">
+      <div className="flex shrink-0 items-center">
+        <button
+          className="btn rounded-r-none"
+          onClick={organize}
+          disabled={organizing || !!replay}
+          title="Auto-organizar el diagrama"
+          aria-label="Auto-organizar"
+        >
           <IconLayout />
-          {organizing ? 'Organizando…' : 'Auto-organizar'}
+          <span className={LABEL}>{organizing ? 'Organizando…' : 'Auto-organizar'}</span>
         </button>
         <label className="btn -ml-px cursor-pointer gap-1 rounded-l-none px-2 text-xs text-slate-500" title="Agrupar por step al auto-organizar">
-          <input type="checkbox" checked={groupByStep} onChange={(e) => setGroupByStep(e.target.checked)} />
-          por step
+          <input type="checkbox" checked={groupByStep} onChange={(e) => setGroupByStep(e.target.checked)} aria-label="Agrupar por step" />
+          <span>por step</span>
         </label>
       </div>
       <button
-        className={`btn ${replay ? 'border-slate-400 bg-slate-100' : ''}`}
+        className={`btn shrink-0 ${replay ? 'border-slate-400 bg-slate-100' : ''}`}
         onClick={() =>
           replay
             ? setReplay(null)
@@ -93,8 +103,11 @@ export function Toolbar({ project }: { project: ProjectDto }) {
               )
         }
         title="Reconstruir el modelo step por step"
+        aria-label="Replay"
+        aria-pressed={!!replay}
       >
-        <IconPlay width={13} height={13} /> Replay
+        <IconPlay width={13} height={13} />
+        <span className={LABEL}>Replay</span>
       </button>
       <IconButton label="Buscar tabla o columna (⌘K)" onClick={() => setSearchOpen(true)}>
         <IconSearch />
@@ -105,10 +118,11 @@ export function Toolbar({ project }: { project: ProjectDto }) {
       <IconButton label="Actividad" active={activityOpen} onClick={toggleActivity}>
         <IconHistory />
       </IconButton>
-      <button className="btn" onClick={() => setImporting(true)} title="Importar DBML o DDL de SQL Server">
-        Importar
+      <button className="btn shrink-0" onClick={() => setImporting(true)} title="Importar DBML o DDL de SQL Server" aria-label="Importar">
+        <IconUpload />
+        <span className={LABEL}>Importar</span>
       </button>
-      <ExportMenu project={project} />
+      <ExportMenu project={project} labelClassName={LABEL} icon={<IconDownload />} />
       {importing && <ImportDialog project={project} onClose={() => setImporting(false)} />}
     </div>
   )

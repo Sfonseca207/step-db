@@ -67,6 +67,15 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
   const pendingFit = useRef(!layout.viewport)
   const animRef = useRef<number | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  // El minimapa estorba en un canvas angosto.
+  const [roomy, setRoomy] = useState(true)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const observer = new ResizeObserver(([entry]) => setRoomy(entry.contentRect.width >= 640))
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
   /** Proporción del canvas (ancho / alto) para acomodar los bloques de steps. */
   const aspectOf = useCallback(() => {
     const el = containerRef.current
@@ -323,7 +332,7 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
       >
         {showHulls && <StepHulls nodes={visibleNodes} />}
         <Background variant={BackgroundVariant.Dots} gap={18} size={1.4} color="#dbe2ea" bgColor="#ffffff" />
-        <MiniMap
+        {roomy && <MiniMap
           pannable
           zoomable
           nodeColor={(n) => (n.data as { color?: string }).color ?? '#94A3B8'}
@@ -331,7 +340,8 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
           nodeBorderRadius={4}
           maskColor="rgba(248,250,252,0.7)"
           className="!rounded-xl !border !border-slate-200 !shadow-sm"
-        />
+          style={{ width: 176, height: 124 }}
+        />}
         <Controls showInteractive={false} showFitView={false} className="!rounded-lg !border !border-slate-200 !shadow-sm">
           <ControlButton onClick={() => canvasActions.fitView()} title="Encuadrar todo" aria-label="Encuadrar todo">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>

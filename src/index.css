@@ -16,6 +16,12 @@ body {
   @apply bg-white text-slate-800 antialiased;
 }
 
+/* Barras de scroll discretas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
 /* Botones y campos base */
 @layer components {
   .btn {
@@ -75,6 +81,26 @@ body {
   animation: sdb-pop 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .sdb-overlay {
+  animation: sdb-fade-in 180ms ease-out;
+}
+
+/* Diálogo modal nativo */
+.sdb-dialog {
+  margin: auto;
+  width: min(28rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: white;
+  color: inherit;
+  padding: 0;
+  box-shadow: 0 20px 50px -12px rgb(15 23 42 / 0.35);
+  animation: sdb-pop 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sdb-dialog::backdrop {
+  background: rgb(15 23 42 / 0.3);
+  backdrop-filter: blur(2px);
   animation: sdb-fade-in 180ms ease-out;
 }
 .sdb-shake {
