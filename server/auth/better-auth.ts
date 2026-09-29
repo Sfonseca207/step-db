@@ -44,6 +44,9 @@ export const auth = betterAuth({
     },
   },
   advanced: {
+    // Detrás del proxy de Railway la IP del cliente llega en `x-real-ip` (un solo valor);
+    // `x-forwarded-for` trae además la del edge y Better Auth descarta las cadenas sin proxies de confianza.
+    ipAddress: { ipAddressHeaders: ['x-real-ip', 'x-forwarded-for'] },
     useSecureCookies: isProduction,
     defaultCookieAttributes: { httpOnly: true, sameSite: 'lax', secure: isProduction },
   },
