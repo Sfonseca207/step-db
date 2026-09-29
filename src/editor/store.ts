@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { columnTable } from '../core/diff.ts'
 import type { Diagnostic, FileKind, ModelDiff, ProjectModel } from '../core/types.ts'
 
 export type FocusMode = 'all' | 'step' | 'deps'
@@ -119,6 +120,16 @@ function computeFocusSet(
   return withDeps
 }
 
+function computeRelated(model: ProjectModel | null, key: string | null): Set<string> | null {
+  if (!key || !model || !model.tables.some((t) => t.key === key)) return null
+  const related = new Set([key])
+  for (const r of model.relations) {
+    if (r.from.table === key) related.add(r.to.table)
+    if (r.to.table === key) related.add(r.from.table)
+  }
+  return related
+}
+
 const emptyHighlights = (): Highlights => ({ newTables: {}, removedTables: {}, flashColumns: {}, newRelations: {} })
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -184,6 +195,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       model: nextModel,
       errors,
       focusSet: computeFocusSet(nextModel, s.focusMode, s.selectedStepId),
+      selectedRelated: computeRelated(nextModel, s.selectedTable),
     })
   },
   setWarnings(warnings) {
@@ -220,16 +232,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ focusMode: mode, focusSet: computeFocusSet(s.model, mode, s.selectedStepId) })
   },
   selectTable(key) {
-    const model = get().model
-    let related: Set<string> | null = null
-    if (key && model) {
-      related = new Set([key])
-      for (const r of model.relations) {
-        if (r.from.table === key) related.add(r.to.table)
-        if (r.to.table === key) related.add(r.from.table)
-      }
-    }
-    set({ selectedTable: key, selectedRelated: related })
+    set({ selectedTable: key, selectedRelated: computeRelated(get().model, key) })
   },
   hoverEdge(edgeId, columns) {
     set({ hoveredEdge: edgeId, hoverColumns: columns ?? {} })
@@ -257,7 +260,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     for (const t of diff.tables.added) newTables[t] = token
     for (const t of diff.tables.removed) removedTables[t] = token
     for (const c of [...diff.columns.added, ...diff.columns.changed]) {
-      if (!added.has(c.slice(0, c.lastIndexOf('.')))) flashColumns[c] = token
+      if (!added.has(columnTable(c))) flashColumns[c] = token
     }
     for (const r of diff.relations.added) newRelations[r] = token
     set({ highlights: { newTables, removedTables, flashColumns, newRelations } })

@@ -1,5 +1,13 @@
 import type { ColumnModel, DiffEntry, ModelDiff, ProjectModel, RelationModel, TableModel } from './types.ts'
 
+/**
+ * Tabla de un id de columna `schema.tabla.columna`. Las columnas Mongo pueden
+ * tener puntos (`respuesta.codigo`), así que la tabla son los dos primeros segmentos.
+ */
+export function columnTable(columnId: string): string {
+  return columnId.split('.').slice(0, 2).join('.')
+}
+
 const emptyEntry = (): DiffEntry => ({ added: [], removed: [], changed: [] })
 
 export function emptyDiff(): ModelDiff {
@@ -79,9 +87,8 @@ function plural(n: number, singular: string, pluralForm: string): string {
 export function summarizeDiff(diff: ModelDiff): string {
   const addedTables = new Set(diff.tables.added)
   const removedTables = new Set(diff.tables.removed)
-  const tableOf = (col: string) => col.slice(0, col.lastIndexOf('.'))
-  const colsAdded = diff.columns.added.filter((c) => !addedTables.has(tableOf(c))).length
-  const colsRemoved = diff.columns.removed.filter((c) => !removedTables.has(tableOf(c))).length
+  const colsAdded = diff.columns.added.filter((c) => !addedTables.has(columnTable(c))).length
+  const colsRemoved = diff.columns.removed.filter((c) => !removedTables.has(columnTable(c))).length
   const parts: string[] = []
   const push = (sign: string, n: number, s: string, p: string) => {
     if (n > 0) parts.push(`${sign}${plural(n, s, p)}`)

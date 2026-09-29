@@ -224,16 +224,27 @@ export function Canvas({ layout, onPersistPositions, onPersistViewport }: Props)
         nodes: keys && keys.length > 0 ? keys.map((id) => ({ id })) : undefined,
         padding: keys && keys.length > 0 ? 0.35 : 0.15,
         duration: prefersReducedMotion() ? 0 : 500,
-        maxZoom: 1.25,
+        maxZoom: 1,
       })
     }
     canvasActions.positions = () => ({ ...positionsRef.current })
   }, [model, steps, sizesOf, animateTo, onPersistPositions, fitView])
 
+  // Centrar: espera a que las tablas pedidas existan y estén medidas (p. ej. recién creadas por MCP).
+  const pendingCenter = useRef<{ tables: string[]; token: number; since: number } | null>(null)
   useEffect(() => {
-    if (!centerRequest) return
-    canvasActions.fitView(centerRequest.tables)
+    if (centerRequest) pendingCenter.current = { ...centerRequest, since: Date.now() }
   }, [centerRequest])
+  useEffect(() => {
+    const req = pendingCenter.current
+    if (!req) return
+    const byId = new Map(nodes.map((n) => [n.id, n]))
+    const ready = req.tables.filter((k) => byId.get(k)?.measured?.width)
+    if (ready.length === req.tables.length || Date.now() - req.since > 2500) {
+      pendingCenter.current = null
+      if (ready.length > 0) canvasActions.fitView(ready)
+    }
+  }, [nodes, centerRequest])
 
   return (
     <div className="sdb-canvas relative h-full w-full bg-white">

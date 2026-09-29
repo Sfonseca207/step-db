@@ -1,75 +1,106 @@
-# React + TypeScript + Vite
+# StepDB
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Modelado de bases de datos **por steps** (etapas de trabajo), al estilo de [dbdiagram.io](https://dbdiagram.io):
 
-Currently, two official plugins are available:
+- Cada step tiene fecha, color, descripción y notas; sus tablas llevan su color y las relaciones entre steps se pintan con el gradiente de ambos.
+- El modelo se escribe en **DBML** (SQL Server) y en DBML con schema `mongo` para **colecciones MongoDB**, con referencias lógicas entre ambos.
+- **Servidor MCP** en `/mcp`: Claude Code (o cualquier agente) lee y escribe el modelo con validación, y la UI se actualiza al instante animando lo que cambió.
+- Exporta **T-SQL de SQL Server** (completo, por step o idempotente), scripts **mongosh** con `$jsonSchema` y **DBML combinado** para dbdiagram.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Especificación completa: [`docs/SPEC-MVP.md`](docs/SPEC-MVP.md). Decisiones de implementación: [`docs/DECISIONES.md`](docs/DECISIONES.md). Pendientes: [`docs/PENDIENTES.md`](docs/PENDIENTES.md).
 
-## React Compiler
+## Arquitectura
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Carpeta | Qué hay |
+|---|---|
+| `src/` | Frontend React 19 + Vite: React Flow (canvas), Monaco (editor), Zustand, TanStack Query, Tailwind v4 |
+| `src/core/` | Lógica **compartida** front/back (TS puro): merge y parseo DBML con mapa de offsets, diff semántico, linter y exportadores |
+| `server/` | Backend Hono sobre Node (type stripping, sin compilar): API REST, WebSocket, MCP, Better Auth y Drizzle |
+| `server/db/migrations/` | Migraciones SQL generadas por drizzle-kit |
+| `server/seed/gasapp/` | DBML del proyecto de ejemplo (GasApp) |
 
-## Expanding the ESLint configuration
+Un solo proceso sirve la UI compilada (`dist/`), la API (`/api`), el WebSocket (`/ws`) y el MCP (`/mcp`). Postgres es la fuente de verdad.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Correr en local
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Requisitos: Node ≥ 24 y Docker.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
+cp .env.example .env          # y ajusta BETTER_AUTH_SECRET y ALLOWED_EMAILS
+npm run db:up                 # Postgres 18 en Docker (crea stepdb y stepdb_test)
+npm run db:migrate            # aplica migraciones
+npm run dev                   # Vite (5173) + API (8787) con proxy de /api, /ws y /mcp
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+Abre <http://localhost:5173>, regístrate con un correo de `ALLOWED_EMAILS` (en local: `qa@stepdb.local`) y pulsa **Crear proyecto de ejemplo**.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Otros comandos:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm test                      # Vitest (core, exportadores, API, WebSocket y MCP contra stepdb_test)
+npx vitest run server/mcp.test.ts          # un solo archivo
+npx vitest run -t "409"                    # tests cuyo nombre coincide
+npm run lint
+npm run build && npm start    # build de producción servido por Hono en :8787
+npm run db:generate           # nueva migración tras cambiar server/db/schema.ts
+npm run db:down               # detiene Postgres (los datos quedan en el volumen)
+```
 
+## Conectar Claude Code por MCP
+
+1. En la app, entra a **Tokens MCP** y crea un token. Se muestra **una sola vez** (en la base solo queda su hash SHA-256) junto con el comando listo para copiar.
+2. Regístralo en Claude Code:
+
+   ```bash
+   claude mcp add --transport http stepdb http://localhost:8787/mcp --header "Authorization: Bearer sdb_…"
+   ```
+
+   (También funciona `http://localhost:5173/mcp` a través del proxy de Vite.)
+3. Pídele a Claude que llame a `get_guide` y `get_project_overview`. Cada `write_step_file` valida el proyecto completo antes de guardar y la UI abierta anima el cambio y muestra un toast "Claude · step: +N tablas…".
+
+Tools disponibles: `list_projects`, `get_guide`, `get_project_overview`, `get_step`, `create_step`, `update_step`, `write_step_file`, `validate_project`, `export`, `focus`.
+
+Prueba de humo sin Claude Code:
+
+```bash
+STEPDB_TOKEN=sdb_… node scripts/mcp-smoke.ts http://localhost:8787/mcp          # lista tools y steps
+STEPDB_TOKEN=sdb_… node scripts/mcp-smoke.ts http://localhost:8787/mcp --demo   # escribe una colección de ejemplo
+```
+
+Los tokens se pueden revocar desde la misma página; un token revocado recibe `401`.
+
+## Variables de entorno
+
+| Variable | Local | Descripción |
+|---|---|---|
+| `DATABASE_URL` | `postgres://stepdb:stepdb@localhost:5432/stepdb` | Conexión a Postgres |
+| `DATABASE_URL_TEST` | `postgres://stepdb:stepdb@localhost:5432/stepdb_test` | Base de `npm test` |
+| `DB_DRIVER` | `postgres` | Driver de base (solo `postgres` por ahora) |
+| `PORT` | `8787` | Puerto del servidor |
+| `BETTER_AUTH_SECRET` | `openssl rand -base64 32` | Firma de sesiones |
+| `BETTER_AUTH_URL` | `http://localhost:5173` | URL pública de la app |
+| `ALLOWED_EMAILS` | `tu@correo.com,qa@stepdb.local` | Lista blanca de registro |
+
+El servidor valida estas variables con zod al arrancar y no inicia si falta alguna.
+
+## Despliegue en Railway (preparado, no ejecutado)
+
+`railway.json` define: build `npm run build`, pre-deploy `npm run db:migrate` (si falla, Railway mantiene la versión anterior), start `npm start` y healthcheck `/health`.
+
+Variables por entorno del servicio `step-db`:
+
+| Variable | development | production |
+|---|---|---|
+| `DATABASE_URL` | `${{Postgres-4iHR.DATABASE_URL}}` | `${{Postgres.DATABASE_URL}}` |
+| `PORT` | `8080` | `8080` |
+| `NODE_ENV` | `production` | `production` |
+| `BETTER_AUTH_URL` | `https://step-db-development-dd0b.up.railway.app` | `https://step-db-production.up.railway.app` |
+| `BETTER_AUTH_SECRET` | secreto propio | secreto propio (distinto) |
+| `ALLOWED_EMAILS` | correos permitidos | correos permitidos |
+
+Con `NODE_ENV=production` las cookies son `Secure` y se activa HSTS. Conexión MCP remota:
+
+```bash
+claude mcp add --transport http stepdb https://<dominio>/mcp --header "Authorization: Bearer sdb_…"
 ```

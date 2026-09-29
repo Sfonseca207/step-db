@@ -164,6 +164,14 @@ describe('diffModels', () => {
     expect(summarizeDiff(diff)).toBe('~1 columna, −1 tabla, −1 relación')
   })
 
+  it('no cuenta aparte las columnas punteadas de una colección nueva', () => {
+    const prev = buildProjectModel([step('a', 1, 'Table a {\n  id int [pk]\n}')]).model
+    const next = buildProjectModel([
+      step('a', 1, 'Table a {\n  id int [pk]\n}', 'Table mongo.l {\n  _id objectId [pk]\n  "r.codigo" int\n  "r.x.y" string\n}'),
+    ]).model
+    expect(summarizeDiff(diffModels(prev, next))).toBe('+1 tabla')
+  })
+
   it('modelos iguales → diff vacío', () => {
     const m = buildProjectModel([step('a', 1, base)]).model
     expect(isEmptyDiff(diffModels(m, m))).toBe(true)

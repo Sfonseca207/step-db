@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router'
 import type { ProjectDto, RealtimeEvent } from '../core/api.ts'
+import { columnTable } from '../core/diff.ts'
 import { CLIENT_ID } from '../lib/api.ts'
 import { projectQueryKey } from './hooks.ts'
 import { useEditorStore } from './store.ts'
@@ -19,6 +20,7 @@ export function useRealtime(projectId: string) {
     let closed = false
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     let pingTimer: ReturnType<typeof setInterval> | null = null
+    let queue: Promise<void> = Promise.resolve()
     const key = projectQueryKey(projectId)
 
     async function onEvent(ev: RealtimeEvent) {
@@ -33,7 +35,7 @@ export function useRealtime(projectId: string) {
             ? [
                 ...ev.diff.tables.added,
                 ...ev.diff.tables.changed,
-                ...[...ev.diff.columns.added, ...ev.diff.columns.changed].map((c) => c.slice(0, c.lastIndexOf('.'))),
+                ...[...ev.diff.columns.added, ...ev.diff.columns.changed].map(columnTable),
               ]
             : []
           store.pushToast({
@@ -81,7 +83,8 @@ export function useRealtime(projectId: string) {
         if (typeof e.data !== 'string' || e.data === 'pong') return
         try {
           const msg = JSON.parse(e.data) as RealtimeEvent | { type: 'hello' }
-          if (msg.type !== 'hello') void onEvent(msg)
+          // En orden: un `ui.focus` debe esperar al refetch del `model.changed` previo.
+          if (msg.type !== 'hello') queue = queue.then(() => onEvent(msg)).catch(() => {})
         } catch {
           // mensaje inválido: se ignora
         }

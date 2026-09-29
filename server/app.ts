@@ -6,7 +6,8 @@ import { csrf } from 'hono/csrf'
 import { auth, trustedOrigins } from './auth/better-auth.ts'
 import { pingDb } from './db/client.ts'
 import { HttpError } from './lib/errors.ts'
-import { requireToken, requireUser, type AuthVars } from './middleware/auth.ts'
+import { requireUser, type AuthVars } from './middleware/auth.ts'
+import { mcpRoutes } from './mcp/routes.ts'
 import { originGuard, securityHeaders } from './middleware/security.ts'
 import { exportRoutes } from './modules/export/routes.ts'
 import { fileRoutes } from './modules/files/routes.ts'
@@ -60,10 +61,7 @@ export function createApp() {
   app.route('/api', api)
 
   // MCP (token Bearer)
-  const mcp = new Hono<AuthVars>()
-  mcp.use('*', requireToken)
-  mcp.all('/', (c) => c.json({ error: { code: 'not_implemented', message: 'MCP en construcción' } }, 501))
-  app.route('/mcp', mcp)
+  app.route('/mcp', mcpRoutes)
 
   const apiNotFound = () => new Response(JSON.stringify({ error: { code: 'not_found', message: 'Ruta no encontrada' } }), {
     status: 404,

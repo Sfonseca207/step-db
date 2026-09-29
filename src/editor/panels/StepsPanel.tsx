@@ -180,6 +180,7 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                   <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-800" title={s.slug}>
                     {s.name}
                   </span>
+                  {active && <span className="rounded bg-slate-900 px-1.5 text-[10px] font-semibold text-white">activo</span>}
                   <span
                     className={`text-xs ${s.status === 'completado' ? 'text-emerald-600' : 'text-sky-600'}`}
                     title={s.status === 'completado' ? 'Completado' : 'En curso'}
@@ -187,14 +188,13 @@ export function StepsPanel({ project }: { project: ProjectDto }) {
                     {s.status === 'completado' ? '✓' : '◉'}
                   </span>
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500">
+                <div className="mt-1 flex items-center gap-2 text-[11px] whitespace-nowrap text-slate-500">
                   <span>{shortDate(s.workDate)}</span>
                   <span className="text-slate-300">·</span>
                   <span>
                     {st?.tables ?? 0} {st?.tables === 1 ? 'tabla' : 'tablas'}
                     {st && st.collections > 0 ? ` · ${st.collections} ${st.collections === 1 ? 'colección' : 'colecciones'}` : ''}
                   </span>
-                  {active && <span className="ml-auto rounded bg-slate-900 px-1.5 text-[10px] font-semibold text-white">activo</span>}
                 </div>
                 {st && st.foreign.length > 0 && (
                   <p
