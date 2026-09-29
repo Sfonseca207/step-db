@@ -1,0 +1,34 @@
+// Step 04 · Log de integraciones (MongoDB)
+// Los logs salen de SQL Server: trazabilidad de envíos a servicios externos.
+
+Table mongo.log_envio_venta [note: 'Trazabilidad de envíos de ventas a servicios externos'] {
+  _id objectId [pk]
+  venta_id long [not null]
+  servicio string [not null, note: 'dian | erp | fidelizacion']
+  estado string [not null, note: 'pendiente | enviado | error']
+  "respuesta.codigo" int
+  "respuesta.mensaje" string
+  intentos int [not null, default: 0]
+  creado_en date [not null]
+
+  indexes {
+    (venta_id, servicio)
+    estado
+  }
+}
+
+Table mongo.log_evento_factura [note: 'Eventos DIAN recibidos por factura'] {
+  _id objectId [pk]
+  factura_id long [not null]
+  evento string [not null]
+  payload object
+  etiquetas "array<string>"
+  recibido_en date [not null]
+
+  indexes {
+    factura_id
+  }
+}
+
+Ref: mongo.log_envio_venta.venta_id > ventas.venta.id
+Ref: mongo.log_evento_factura.factura_id > facturacion.factura.id

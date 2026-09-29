@@ -1,0 +1,51 @@
+// Step 01 · Recepción de ventas
+// Núcleo transaccional: estaciones, productos y ventas recibidas desde los surtidores.
+
+Enum ventas.estado_venta {
+  registrada [note: 'Recibida desde el surtidor']
+  anulada
+}
+
+Table core.estacion [note: 'Estación de servicio'] {
+  id int [pk, increment]
+  codigo varchar(10) [not null, unique]
+  nombre nvarchar(120) [not null]
+  ciudad nvarchar(80) [not null]
+  activa bit [not null, default: 1]
+}
+
+Table ventas.producto [note: 'Combustibles y productos de tienda'] {
+  id int [pk, increment]
+  codigo varchar(20) [not null, unique]
+  nombre nvarchar(80) [not null]
+  unidad varchar(10) [not null, note: 'galón, litro, unidad']
+}
+
+Table ventas.venta [note: 'Venta registrada en una estación'] {
+  id bigint [pk, increment]
+  estacion_id int [not null, ref: > core.estacion.id]
+  producto_id int [not null, ref: > ventas.producto.id]
+  fecha datetime2 [not null, default: `sysutcdatetime()`]
+  cantidad decimal(12,3) [not null]
+  precio_unitario decimal(18,2) [not null]
+  total decimal(18,2) [not null]
+  estado ventas.estado_venta [not null, default: 'registrada']
+  tercero_id bigint [step: "02-terceros-clientes", note: 'Cliente identificado en la venta']
+  facturada bit [not null, default: 0, step: "03-facturacion"]
+
+  indexes {
+    (estacion_id, fecha) [name: 'ix_venta_estacion_fecha']
+    producto_id [name: 'ix_venta_producto']
+  }
+}
+
+Table ventas.venta_pago [note: 'Medios de pago de la venta'] {
+  id bigint [pk, increment]
+  venta_id bigint [not null, ref: > ventas.venta.id]
+  medio_pago varchar(20) [not null]
+  valor decimal(18,2) [not null]
+
+  indexes {
+    venta_id [name: 'ix_venta_pago_venta']
+  }
+}

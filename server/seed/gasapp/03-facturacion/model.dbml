@@ -1,0 +1,25 @@
+// Step 03 · Facturación electrónica
+
+Table facturacion.resolucion [note: 'Resolución de numeración DIAN'] {
+  id int [pk, increment]
+  prefijo varchar(10) [not null]
+  desde bigint [not null]
+  hasta bigint [not null]
+  vigente_hasta date [not null]
+}
+
+Table facturacion.factura [note: 'Factura electrónica emitida por venta'] {
+  id bigint [pk, increment]
+  venta_id bigint [not null, unique, ref: - ventas.venta.id]
+  tercero_id bigint [not null, ref: > terceros.tercero.id]
+  resolucion_id int [not null, ref: > facturacion.resolucion.id]
+  numero varchar(30) [not null, unique]
+  fecha_emision datetime2 [not null]
+  total decimal(18,2) [not null]
+  cufe varchar(96) [note: 'Código único de factura electrónica']
+
+  indexes {
+    tercero_id [name: 'ix_factura_tercero']
+    resolucion_id [name: 'ix_factura_resolucion']
+  }
+}

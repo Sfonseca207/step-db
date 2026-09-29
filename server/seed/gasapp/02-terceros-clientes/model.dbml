@@ -1,0 +1,26 @@
+// Step 02 · Terceros y clientes
+
+Table terceros.tercero [note: 'Persona natural o jurídica'] {
+  id bigint [pk, increment]
+  tipo_documento varchar(5) [not null, note: 'CC, NIT, CE, PAS']
+  numero_documento varchar(20) [not null]
+  razon_social nvarchar(160) [not null]
+  email varchar(160)
+
+  indexes {
+    (tipo_documento, numero_documento) [unique, name: 'ux_tercero_documento']
+  }
+}
+
+Table terceros.vehiculo [note: 'Vehículos asociados a un cliente (flotas)'] {
+  id bigint [pk, increment]
+  tercero_id bigint [not null, ref: > terceros.tercero.id]
+  placa varchar(10) [not null, unique]
+
+  indexes {
+    tercero_id [name: 'ix_vehiculo_tercero']
+  }
+}
+
+// La columna ventas.venta.tercero_id se agregó en este step (ver archivo del step 01).
+Ref: ventas.venta.tercero_id > terceros.tercero.id
